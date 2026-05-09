@@ -1,0 +1,99 @@
+import pytest
+from app.services.skill_service import (
+    build_skill_fingerprint,
+    skill_fingerprint_to_vector,
+    issue_text_to_vector,
+    extract_required_skills,
+    _stable_hash,
+)
+
+
+def test_stable_hash_deterministic():
+    val1 = _stable_hash("python", 64)
+    val2 = _stable_hash("python", 64)
+    assert val1 == val2
+    assert 0 <= val1 < 64
+
+
+def test_stable_hash_different_inputs_different_buckets():
+    val_a = _stable_hash("python", 64)
+    val_b = _stable_hash("javascript", 64)
+    assert val_a != val_b
+
+
+def test_build_skill_fingerprint_basic():
+    repos = [
+        {
+            "name": "repo1",
+            "language": "Python",
+            "topics": ["web", "api"],
+            "stargazers_count": 10,
+            "fork": False,
+        },
+        {
+            "name": "repo2",
+            "language": "JavaScript",
+            "topics": ["frontend", "react"],
+            "stargazers_count": 5,
+            "fork": False,
+        },
+    ]
+    fp = build_skill_fingerprint(repos)
+    assert fp["total_repos"] == 2
+    assert "python" in fp["languages"]
+    assert "javascript" in fp["languages"]
+    assert fp["total_stars_received"] == 15
+    assert fp["experience_level"] == "beginner"
+
+
+def test_build_skill_fingerprint_skips_forks():
+    repos = [
+        {"name": "own", "language": "Python", "fork": False},
+        {"name": "forked", "language": "Java", "fork": True},
+    ]
+    fp = build_skill_fingerprint(repos)
+    assert fp["total_repos"] == 1
+    assert "java" not in fp["languages"]
+
+
+def test_skill_fingerprint_to_vector_output_shape():
+    fp = {
+        "languages": {"python": 0.5, "javascript": 0.3},
+        "topics": ["web", "api"],
+        "categories": {"backend": ["python"], "frontend": ["javascript"]},
+        "experience_level": "beginner",
+        "top_skills": ["python", "javascript"],
+        "total_repos": 2,
+        "total_stars_received": 0,
+    }
+    vec = skill_fingerprint_to_vector(fp)
+    assert len(vec) == 128
+    assert all(isinstance(v, float) for v in vec)
+    # Should be normalized (norm ~ 1)
+    import numpy as np
+    norm = np.linalg.norm(vec)
+    assert abs(norm - 1.0) < 0.01
+
+
+def test_issue_text_to_vector_output_shape():
+    vec = issue_text_to_vector("Add Python support", "We need to support python 3.11", ["enhancement"])
+    assert len(vec) == 128
+    import numpy as np
+    norm = np.linalg.norm(vec)
+    assert abs(norm - 1.0) < 0.01 or norm == 0
+
+
+def test_extract_required_skills():
+    skills = extract_required_skills("Add Python API endpoints", "Use FastAPI", ["backend"])
+    assert "backend" in skills["categories"]
+    assert skills["complexity"] == 0.5
+
+
+def test_extract_required_skills_beginner():
+    skills = extract_required_skills("Easy beginner issue", "Simple starter task", ["good first issue"])
+    assert skills["complexity"] == 0.2
+
+
+def test_extract_required_skills_advanced():
+    skills = extract_required_skills("Complex advanced feature", "Expert level implementation", ["enhancement"])
+    assert skills["complexity"] == 0.8

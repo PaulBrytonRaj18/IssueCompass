@@ -1,0 +1,72 @@
+# Environment
+.env
+.env.local
+.env.*.local
+.python-version
+
+# Dependencies
+node_modules/
+**/node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+frontend/.next/
+frontend/out/
+
+# Docker
+docker-compose.override.yml
+postgres_data/
+*.env.*.local
+
+# Database
+*.db
+*.sqlite3
+*.sqlite3-journal
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+__pypackages__/
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# Misc
+*.bak
+*.tmp
+*.orig
+*.rej

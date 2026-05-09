@@ -1,0 +1,37 @@
+import type { Metadata } from "next";
+import "../styles/globals.css";
+import { Providers } from "./providers";
+
+export const metadata: Metadata = {
+  title: "OpenIssue — Find open source issues matched to your skills",
+  description:
+    "Stop searching. Start contributing. OpenIssue matches you to open-source issues you can actually solve based on your real GitHub activity.",
+  keywords: ["open source", "github", "contributing", "developer", "issues"],
+  openGraph: {
+    title: "OpenIssue",
+    description: "Find open source issues matched to your skills",
+    type: "website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+      </head>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
