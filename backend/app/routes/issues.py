@@ -1,14 +1,20 @@
+import asyncio
+import logging
 from datetime import datetime
-from typing import Optional, List
-from fastapi import APIRouter, Depends, Header, Query, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from typing import List, Optional
 
-from app.core.database import get_db, AsyncSessionLocal
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import AsyncSessionLocal, get_db
 from app.models.models import Issue, Repository, SavedIssue, User
-from app.schemas.schemas import IssueMatchResponse, MatchedIssue, IssuePublic, RepositoryPublic
-from app.services import github_service, skill_service, matching_service
 from app.routes.auth import get_current_user
+from app.schemas.schemas import IssueMatchResponse, IssuePublic, MatchedIssue, RepositoryPublic
+from app.services import github_service, matching_service, skill_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -105,92 +111,145 @@ async def index_issues(
 
 
 async def _index_issues_background(languages: List[str]):
-    """Background task to fetch and index issues from GitHub."""
+    """Background task to fetch and index issues from GitHub.
+    Runs all language/label combinations in parallel for speed.
+    Each task uses batch upserts to minimize DB round-trips.
+    """
+    labels = ["good first issue", "help wanted"]
+    tasks = [
+        _index_one(language, label)
+        for language in languages
+        for label in labels
+    ]
+    results = await asyncio.gather(*tasks)
+    total = sum(results)
+    logger.info("Indexing complete: %d items processed", total)
+
+
+async def _index_one(language: str, label: str) -> int:
+    """Fetch and index issues for one language/label combination."""
     async with AsyncSessionLocal() as db:
-        for language in languages:
-            for label in ["good first issue", "help wanted"]:
-                result = await github_service.search_issues_global(
-                    language=language, label=label, per_page=50
-                )
-                items = result.get("items", [])
-                for item in items:
-                    await _upsert_issue(db, item)
-        await db.commit()
+        try:
+            result = await github_service.search_issues_global(
+                language=language, label=label, per_page=50
+            )
+            items = result.get("items", [])
+            if not items:
+                return 0
+            await _batch_upsert(db, items)
+            await db.commit()
+            return len(items)
+        except Exception as e:
+            await db.rollback()
+            logger.error("Error indexing %s/%s: %s", language, label, e)
+            return 0
 
 
-async def _upsert_issue(db: AsyncSession, item: dict):
-    """Insert or update an issue from GitHub API response."""
-    try:
-        repo_data = item.get("repository") or {}
+async def _batch_upsert(db: AsyncSession, items: List[dict]):
+    """Batch upsert repositories and issues for a set of search results."""
+    # Parse all items into a flat list
+    parsed = []
+    for item in items:
         repo_url = item.get("repository_url", "")
         repo_full_name = repo_url.replace("https://api.github.com/repos/", "")
+        if not repo_full_name or "/" not in repo_full_name:
+            continue
+        repo_data = item.get("repository") or {}
+        parsed.append({
+            "item": item,
+            "repo_full_name": repo_full_name,
+            "repo_data": repo_data,
+        })
 
-        # Upsert repository
-        repo_result = await db.execute(
-            select(Repository).where(Repository.full_name == repo_full_name)
+    if not parsed:
+        return
+
+    # ── Batch upsert repositories ──────────────────────────────
+    all_full_names = list({p["repo_full_name"] for p in parsed})
+
+    existing_repos = await db.execute(
+        select(Repository).where(Repository.full_name.in_(all_full_names))
+    )
+    repo_map = {r.full_name: r for r in existing_repos.scalars().all()}
+
+    new_repos = []
+    for full_name in all_full_names:
+        if full_name in repo_map:
+            continue
+        p = next(p2 for p2 in parsed if p2["repo_full_name"] == full_name)
+        rd = p["repo_data"]
+        new_repos.append({
+            "github_id": rd.get("id", _stable_id(full_name)),
+            "full_name": full_name,
+            "name": full_name.split("/")[-1],
+            "owner_login": full_name.split("/")[0],
+            "html_url": f"https://github.com/{full_name}",
+            "stars": rd.get("stargazers_count", 0),
+            "primary_language": rd.get("language"),
+            "topics": rd.get("topics", []),
+            "description": rd.get("description"),
+        })
+
+    if new_repos:
+        stmt = pg_insert(Repository).values(new_repos)
+        stmt = stmt.on_conflict_do_nothing(index_elements=["full_name"])
+        await db.execute(stmt)
+        await db.flush()
+
+        # Re-query to get IDs of newly inserted repos
+        result = await db.execute(
+            select(Repository).where(Repository.full_name.in_(all_full_names))
         )
-        repo = repo_result.scalar_one_or_none()
+        repo_map = {r.full_name: r for r in result.scalars().all()}
+
+    # ── Batch upsert issues ────────────────────────────────────
+    all_github_ids = list({p["item"]["id"] for p in parsed})
+
+    existing_issues = await db.execute(
+        select(Issue).where(Issue.github_id.in_(all_github_ids))
+    )
+    existing_ids = {r.github_id for r in existing_issues.scalars().all()}
+
+    new_issues = []
+    for p in parsed:
+        item = p["item"]
+        if item["id"] in existing_ids:
+            continue
+        repo = repo_map.get(p["repo_full_name"])
         if not repo:
-            repo = Repository(
-                github_id=repo_data.get("id", _stable_id(repo_full_name)),
-                full_name=repo_full_name,
-                name=repo_full_name.split("/")[-1] if "/" in repo_full_name else repo_full_name,
-                owner_login=repo_full_name.split("/")[0] if "/" in repo_full_name else "",
-                html_url=f"https://github.com/{repo_full_name}",
-                stars=repo_data.get("stargazers_count", 0),
-                primary_language=repo_data.get("language"),
-                topics=repo_data.get("topics", []),
-                description=repo_data.get("description"),
-            )
-            db.add(repo)
-            await db.flush()
+            continue
 
-        # Upsert issue
-        issue_result = await db.execute(
-            select(Issue).where(Issue.github_id == item["id"])
-        )
-        issue = issue_result.scalar_one_or_none()
-
-        labels = [l["name"] for l in item.get("labels", [])]
-        is_gfi = any("good first" in l.lower() for l in labels)
-        is_hw = any("help wanted" in l.lower() for l in labels)
-
+        labels = [lb["name"] for lb in item.get("labels", [])]
         title = item.get("title", "")
         body = item.get("body") or ""
         required_skills = skill_service.extract_required_skills(title, body, labels)
         skill_vector = skill_service.issue_text_to_vector(title, body, labels)
         complexity = required_skills.get("complexity", 0.5)
 
-        if not issue:
-            issue = Issue(
-                github_id=item["id"],
-                number=item["number"],
-                title=title,
-                body=body[:2000] if body else None,
-                html_url=item["html_url"],
-                state=item.get("state", "open"),
-                labels=labels,
-                is_good_first_issue=is_gfi,
-                is_help_wanted=is_hw,
-                required_skills=required_skills,
-                skill_vector=skill_vector,
-                complexity_score=complexity,
-                comments=item.get("comments", 0),
-                author_login=item.get("user", {}).get("login"),
-                created_at=_parse_dt(item.get("created_at")),
-                updated_at=_parse_dt(item.get("updated_at")),
-                repository_id=repo.id,
-            )
-            db.add(issue)
-        else:
-            issue.state = item.get("state", "open")
-            issue.comments = item.get("comments", 0)
-            issue.updated_at = _parse_dt(item.get("updated_at"))
-            issue.skill_vector = skill_vector
-            issue.required_skills = required_skills
+        new_issues.append({
+            "github_id": item["id"],
+            "number": item["number"],
+            "title": title,
+            "body": body[:2000] if body else None,
+            "html_url": item["html_url"],
+            "state": item.get("state", "open"),
+            "labels": labels,
+            "is_good_first_issue": any("good first" in lb.lower() for lb in labels),
+            "is_help_wanted": any("help wanted" in lb.lower() for lb in labels),
+            "required_skills": required_skills,
+            "skill_vector": skill_vector,
+            "complexity_score": complexity,
+            "comments": item.get("comments", 0),
+            "author_login": item.get("user", {}).get("login"),
+            "created_at": _parse_dt(item.get("created_at")),
+            "updated_at": _parse_dt(item.get("updated_at")),
+            "repository_id": repo.id,
+        })
 
-    except Exception as e:
-        print(f"Error upserting issue {item.get('id')}: {e}")
+    if new_issues:
+        stmt = pg_insert(Issue).values(new_issues)
+        stmt = stmt.on_conflict_do_nothing(index_elements=["github_id"])
+        await db.execute(stmt)
 
 
 def _stable_id(value: str) -> int:

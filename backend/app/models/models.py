@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Optional, List
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import List, Optional
+
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 
@@ -10,7 +12,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    github_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     github_username: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     github_avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     github_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
@@ -38,7 +40,7 @@ class Repository(Base):
     __tablename__ = "repositories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    github_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(300), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -60,7 +62,7 @@ class Issue(Base):
     __tablename__ = "issues"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    github_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    github_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     number: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(500))
     body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

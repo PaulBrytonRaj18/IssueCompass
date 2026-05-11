@@ -1,27 +1,57 @@
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.routes import auth, github, issues
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from jose import jwt as jose_jwt
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("openissue")
 
 settings = get_settings()
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
+def rate_limit_key(request: Request) -> str:
+    """Rate-limit by user ID (from JWT) when authenticated, else by client IP."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            payload = jose_jwt.decode(
+                auth_header[7:], settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            )
+            user_id = payload.get("sub")
+            if user_id:
+                return f"user:{user_id}"
+        except Exception:
+            pass
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return f"ip:{forwarded.split(',')[0].strip()}"
+    client_host = request.client.host if request.client else "unknown"
+    return f"ip:{client_host}"
+
+
+limiter = Limiter(key_func=rate_limit_key, default_limits=["60/minute"])
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 OpenIssue API starting up...")
+    logger.info("OpenIssue API starting up...")
     await init_db()
-    print("✅ Database initialized")
+    logger.info("Database initialized")
     yield
     # Shutdown
-    print("👋 OpenIssue API shutting down")
+    logger.info("OpenIssue API shutting down")
 
 
 app = FastAPI(
@@ -46,10 +76,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
-app.include_router(auth.router, prefix="/api")
-app.include_router(github.router, prefix="/api")
-app.include_router(issues.router, prefix="/api")
+# Routers (v1)
+API_PREFIX = "/api/v1"
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(github.router, prefix=API_PREFIX)
+app.include_router(issues.router, prefix=API_PREFIX)
 
 
 @app.get("/")

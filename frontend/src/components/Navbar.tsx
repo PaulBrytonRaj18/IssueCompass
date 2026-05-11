@@ -17,8 +17,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const user = session?.user as { username?: string; avatarUrl?: string } &
-    typeof session.user;
+  const user = session?.user as { username?: string; avatarUrl?: string };
 
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-sm">

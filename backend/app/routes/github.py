@@ -1,13 +1,12 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Header
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.core.database import get_db
-from app.models.models import User
-from app.schemas.schemas import UserPublic, SkillFingerprint
-from app.services import github_service, skill_service
 from app.routes.auth import get_current_user
+from app.schemas.schemas import SkillFingerprint, UserPublic
+from app.services import github_service, skill_service
 
 router = APIRouter(prefix="/github", tags=["github"])
 

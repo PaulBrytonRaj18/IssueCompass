@@ -48,6 +48,7 @@ services:
     environment:
       DATABASE_URL: postgresql://openissue:openissue@db:5432/openissue
       REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}

@@ -1,9 +1,10 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+
 from app.models.models import Issue, Repository, User
-from app.services.skill_service import SKILL_CATEGORIES
 
 
 def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
@@ -90,9 +91,9 @@ async def get_matched_issues(
         query = query.where(Repository.primary_language.ilike(language_filter))
 
     if label_filter == "good_first":
-        query = query.where(Issue.is_good_first_issue == True)
+        query = query.where(Issue.is_good_first_issue.is_(True))
     elif label_filter == "help_wanted":
-        query = query.where(Issue.is_help_wanted == True)
+        query = query.where(Issue.is_help_wanted.is_(True))
 
     pool_size = min(offset + limit * 3, 500)
     query = query.limit(pool_size)
@@ -105,7 +106,7 @@ async def get_matched_issues(
     # Score each issue
     scored = []
     for issue, repo in rows:
-        if user_vector and issue.skill_vector:
+        if user_vector is not None and issue.skill_vector is not None:
             score = cosine_similarity(user_vector, issue.skill_vector)
         else:
             # Fallback: keyword overlap scoring
@@ -134,7 +135,7 @@ def _keyword_score(user_skills: Dict[str, Any], issue: Issue) -> float:
     all_user_skills = user_langs | user_topics
 
     issue_text = f"{issue.title or ''} {issue.body or ''}".lower()
-    issue_labels = [l.lower() for l in (issue.labels or [])]
+    issue_labels = [lb.lower() for lb in (issue.labels or [])]
 
     matches = sum(
         1 for skill in all_user_skills

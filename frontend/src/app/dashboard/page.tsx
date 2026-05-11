@@ -41,7 +41,7 @@ export default function DashboardPage() {
     bio?: string;
     publicRepos?: number;
     followers?: number;
-  } & typeof session?.user;
+  };
 
   // Sync user to backend after login
   const syncUserToBackend = useCallback(async () => {

@@ -1,7 +1,9 @@
-from typing import Dict, List, Any, Optional
 import hashlib
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from app.services.github_service import fetch_user_repos, fetch_repo_languages
+
+from app.services.github_service import fetch_user_repos
 
 
 def _stable_hash(text: str, modulus: int) -> int:
@@ -57,11 +59,11 @@ def build_skill_fingerprint(
 ) -> Dict[str, Any]:
     """
     Analyze repos to produce a structured skill fingerprint.
-    
+
     Args:
         repos: List of GitHub repo objects
         languages_map: Optional map of repo_full_name -> {language: bytes}
-    
+
     Returns:
         Structured skill fingerprint dict
     """
@@ -72,7 +74,7 @@ def build_skill_fingerprint(
     for repo in repos:
         if repo.get("fork"):
             continue  # skip forks for skill analysis
-        
+
         # Languages
         lang = repo.get("language")
         if lang:
@@ -202,7 +204,6 @@ def issue_text_to_vector(title: str, body: str, labels: List[str]) -> List[float
             vector[idx] = min(vector[idx] + 0.15, 1.0)
 
     # Detect categories
-    category_list = list(SKILL_CATEGORIES.keys())
     for i, (cat, keywords) in enumerate(SKILL_CATEGORIES.items()):
         matches = sum(1 for kw in keywords if kw in combined_text)
         if matches > 0:

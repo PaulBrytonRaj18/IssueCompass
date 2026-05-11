@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Header
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from jose import JWTError, jwt
 from sqlalchemy import select
-from jose import jwt, JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User
-from app.schemas.schemas import TokenResponse, UserPublic, GitHubUserData
-from app.services import github_service
+from app.schemas.schemas import GitHubUserData, TokenResponse, UserPublic
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()

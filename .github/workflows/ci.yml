@@ -33,6 +33,9 @@ jobs:
       - name: Type check with mypy
         run: pip install mypy && mypy app/ --ignore-missing-imports
 
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short
+
   # ── Frontend lint & build ────────────────────────────────────
   frontend:
     name: Frontend

@@ -1,5 +1,4 @@
-import pytest
-from app.services.matching_service import cosine_similarity, explain_match, _keyword_score
+from app.services.matching_service import _keyword_score, cosine_similarity, explain_match
 
 
 def test_cosine_similarity_identical():
@@ -51,8 +50,8 @@ def test_explain_match_partial():
 
 
 def test_keyword_score_match():
+
     from app.models.models import Issue
-    import uuid
     issue = Issue(
         id=1,
         github_id=1,

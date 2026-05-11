@@ -36,7 +36,7 @@ export default function ProfilePage() {
     bio?: string;
     publicRepos?: number;
     followers?: number;
-  } & typeof session?.user;
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") { router.push("/"); return; }

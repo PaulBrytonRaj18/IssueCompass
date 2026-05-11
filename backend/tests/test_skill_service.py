@@ -1,10 +1,9 @@
-import pytest
 from app.services.skill_service import (
-    build_skill_fingerprint,
-    skill_fingerprint_to_vector,
-    issue_text_to_vector,
-    extract_required_skills,
     _stable_hash,
+    build_skill_fingerprint,
+    extract_required_skills,
+    issue_text_to_vector,
+    skill_fingerprint_to_vector,
 )
 
 
