@@ -34,7 +34,7 @@ steps:
       - --cpu=$_BACKEND_CPU
       - --memory=$_BACKEND_MEMORY
       - --timeout=$_BACKEND_TIMEOUT
-      - --set-env-vars=DATABASE_URL=$_DATABASE_URL,SECRET_KEY=$_SECRET_KEY,GITHUB_TOKEN=$_GITHUB_TOKEN,FRONTEND_URL=$_FRONTEND_URL,REDIS_URL=$_REDIS_URL
+      - --set-env-vars=DATABASE_URL=$_DATABASE_URL,SECRET_KEY=$_SECRET_KEY,GITHUB_TOKEN=$_GITHUB_TOKEN,FRONTEND_URL=$_FRONTEND_URL
       - --set-secrets=GITHUB_CLIENT_ID=$_GITHUB_CLIENT_ID_SECRET,GITHUB_CLIENT_SECRET=$_GITHUB_CLIENT_SECRET_SECRET
 
   # ── Frontend: Build & push ───────────────────────────────────
@@ -81,11 +81,16 @@ images:
   - gcr.io/$PROJECT_ID/openissue-frontend
 
 # ── Substitutions (set these in Cloud Build trigger or gcloud) ─
+# ⚠️  All _DATABASE_URL, _SECRET_KEY, _GITHUB_TOKEN, _NEXT_PUBLIC_API_URL,
+#     _NEXTAUTH_URL, _NEXTAUTH_SECRET, and _FRONTEND_URL values below
+#     are PLACEHOLDERS. You MUST override them with --substitutions
+#     or via a Cloud Build trigger. The backend will CRASH ON STARTUP
+#     if SECRET_KEY or GITHUB_TOKEN remain unchanged.
 substitutions:
   # Region
   _REGION: us-central1
 
-  # Backend
+  # Backend resource config
   _BACKEND_SERVICE_NAME: openissue-backend
   _BACKEND_MIN_INSTANCES: "0"
   _BACKEND_MAX_INSTANCES: "5"
@@ -94,7 +99,7 @@ substitutions:
   _BACKEND_MEMORY: "1Gi"
   _BACKEND_TIMEOUT: "300s"
 
-  # Frontend
+  # Frontend resource config
   _FRONTEND_SERVICE_NAME: openissue-frontend
   _FRONTEND_MIN_INSTANCES: "0"
   _FRONTEND_MAX_INSTANCES: "5"
@@ -103,18 +108,27 @@ substitutions:
   _FRONTEND_MEMORY: "512Mi"
   _FRONTEND_TIMEOUT: "300s"
 
-  # Backend env vars — set these in the trigger or with --substitutions
+  # ═══════════════════════════════════════════════════════════════
+  # OVERRIDE THESE: real values for your deployment
+  # ═══════════════════════════════════════════════════════════════
+  # Supabase PostgreSQL (with pgvector): postgresql://postgres:pass@db.xxx.supabase.co:6543/postgres
   _DATABASE_URL: postgresql://user:pass@host:5432/db
+  # Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
   _SECRET_KEY: change_me
+  # GitHub Personal Access Token (scopes: public_repo, read:user)
   _GITHUB_TOKEN: change_me
+  # Frontend Cloud Run URL (e.g. https://openissue-frontend-xxxxx-uc.a.run.app)
   _FRONTEND_URL: https://openissue-frontend-xxx-uc.a.run.app
-  _REDIS_URL: ""
 
-  # Frontend env vars
+  # Frontend: public API URL the browser will call
   _NEXT_PUBLIC_API_URL: https://openissue-backend-xxx-uc.a.run.app
+  # Frontend: NextAuth URL (same as frontend URL)
   _NEXTAUTH_URL: https://openissue-frontend-xxx-uc.a.run.app
+  # Generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
   _NEXTAUTH_SECRET: change_me
 
-  # Secret Manager references — format: projects/PROJECT/secrets/SECRET:VERSION
+  # ── Secret Manager references (create these before deploying) ─
+  # gcloud secrets create GITHUB_CLIENT_ID --data-file=<(echo -n "your_id")
+  # gcloud secrets create GITHUB_CLIENT_SECRET --data-file=<(echo -n "your_secret")
   _GITHUB_CLIENT_ID_SECRET: projects/$PROJECT_ID/secrets/GITHUB_CLIENT_ID:latest
   _GITHUB_CLIENT_SECRET_SECRET: projects/$PROJECT_ID/secrets/GITHUB_CLIENT_SECRET:latest

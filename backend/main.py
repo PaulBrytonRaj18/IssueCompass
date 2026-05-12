@@ -80,8 +80,6 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 # CORS — allow Next.js frontends
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "https://open-issue.vercel.app",
-    "https://openissue.netlify.app",
 ]
 if production_frontend := os.environ.get("FRONTEND_URL"):
     ALLOWED_ORIGINS.append(production_frontend)

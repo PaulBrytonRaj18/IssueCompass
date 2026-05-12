@@ -4,7 +4,6 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
-RUN mkdir -p public
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-""}
 RUN npm run build
@@ -34,8 +33,6 @@ ENV PATH=/root/.local/bin:$PATH \
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/.next/standalone ./frontend/
 COPY --from=frontend-builder /app/.next/static ./frontend/.next/static
-COPY --from=frontend-builder /app/public ./frontend/public
-
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY start.sh /start.sh
 RUN chmod +x /start.sh

@@ -50,9 +50,15 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_required(self):
         if not self.SECRET_KEY or self.SECRET_KEY == "change_this_in_production_use_random_string":
-            raise ValueError("SECRET_KEY must be changed from the default in production")
+            raise ValueError(
+                "SECRET_KEY must be changed from the default. "
+                "Generate one with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+            )
         if not self.GITHUB_TOKEN:
-            raise ValueError("GITHUB_TOKEN is required")
+            raise ValueError(
+                "GITHUB_TOKEN is required. Create one at https://github.com/settings/tokens "
+                "(scopes: public_repo, read:user)"
+            )
         return self
 
 
