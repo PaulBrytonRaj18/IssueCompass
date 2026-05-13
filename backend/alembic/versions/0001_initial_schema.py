@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("github_id", sa.Integer(), nullable=False),
+        sa.Column("github_id", sa.BigInteger(), nullable=False),
         sa.Column("github_username", sa.String(100), nullable=False),
         sa.Column("github_avatar_url", sa.String(500), nullable=True),
         sa.Column("github_name", sa.String(200), nullable=True),
@@ -47,7 +47,7 @@ def upgrade() -> None:
     op.create_table(
         "repositories",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("github_id", sa.Integer(), nullable=False),
+        sa.Column("github_id", sa.BigInteger(), nullable=False),
         sa.Column("full_name", sa.String(300), nullable=False),
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
@@ -71,7 +71,7 @@ def upgrade() -> None:
     op.create_table(
         "issues",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("github_id", sa.Integer(), nullable=False),
+        sa.Column("github_id", sa.BigInteger(), nullable=False),
         sa.Column("number", sa.Integer(), nullable=False),
         sa.Column("title", sa.String(500), nullable=False),
         sa.Column("body", sa.Text(), nullable=True),
@@ -105,9 +105,10 @@ def upgrade() -> None:
         sa.Column("issue_id", sa.Integer(), nullable=False),
         sa.Column("saved_at", sa.DateTime(), nullable=False),
         sa.Column("status", sa.String(50), nullable=False, server_default="saved"),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
-        sa.ForeignKeyConstraint(["issue_id"], ["issues.id"]),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["issue_id"], ["issues.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("user_id", "issue_id", name="uq_user_issue"),
     )
     op.create_index("ix_saved_issues_id", "saved_issues", ["id"])
     op.create_index("ix_saved_issues_user_id", "saved_issues", ["user_id"])
