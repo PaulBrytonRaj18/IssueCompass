@@ -35,9 +35,9 @@ def upgrade() -> None:
         sa.Column("followers", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("skill_json", sa.JSON(), nullable=True),
         sa.Column("skill_vector", Vector(128), nullable=True),
-        sa.Column("skill_last_updated", sa.DateTime(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("last_login", sa.DateTime(), nullable=True),
+        sa.Column("skill_last_updated", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("last_login", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_users_id", "users", ["id"])
@@ -59,7 +59,7 @@ def upgrade() -> None:
         sa.Column("primary_language", sa.String(100), nullable=True),
         sa.Column("topics", sa.JSON(), nullable=True),
         sa.Column("is_archived", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("last_indexed", sa.DateTime(), nullable=True),
+        sa.Column("last_indexed", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_repositories_id", "repositories", ["id"])
@@ -85,8 +85,8 @@ def upgrade() -> None:
         sa.Column("complexity_score", sa.Float(), nullable=False, server_default="0.5"),
         sa.Column("comments", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("author_login", sa.String(100), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=True),
-        sa.Column("updated_at", sa.DateTime(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("repository_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["repository_id"], ["repositories.id"]),
         sa.PrimaryKeyConstraint("id"),
@@ -103,7 +103,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("issue_id", sa.Integer(), nullable=False),
-        sa.Column("saved_at", sa.DateTime(), nullable=False),
+        sa.Column("saved_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("status", sa.String(50), nullable=False, server_default="saved"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["issue_id"], ["issues.id"], ondelete="CASCADE"),

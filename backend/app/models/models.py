@@ -37,11 +37,11 @@ class User(Base):
     # Skill fingerprint stored as JSON and vector
     skill_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     skill_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(128), nullable=True)
-    skill_last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    skill_last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     saved_issues: Mapped[List["SavedIssue"]] = relationship("SavedIssue", back_populates="user")
@@ -63,7 +63,7 @@ class Repository(Base):
     primary_language: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     topics: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
-    last_indexed: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_indexed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     issues: Mapped[List["Issue"]] = relationship("Issue", back_populates="repository")
@@ -93,8 +93,8 @@ class Issue(Base):
     # GitHub metadata
     comments: Mapped[int] = mapped_column(Integer, default=0)
     author_login: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Foreign key
     repository_id: Mapped[int] = mapped_column(Integer, ForeignKey("repositories.id"), index=True)
@@ -111,7 +111,7 @@ class SavedIssue(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     issue_id: Mapped[int] = mapped_column(Integer, ForeignKey("issues.id", ondelete="CASCADE"), index=True)
-    saved_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
     status: Mapped[str] = mapped_column(String(50), default="saved")  # saved, in_progress, done
 
     user: Mapped["User"] = relationship("User", back_populates="saved_issues")

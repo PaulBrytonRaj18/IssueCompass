@@ -127,8 +127,8 @@ async def search_trending_repos(
     per_page: int = 30,
 ) -> List[Dict[str, Any]]:
     """Search for recently active, popular repos."""
-    from datetime import datetime, timedelta
-    since = (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
 
     query = f"stars:>100 pushed:>{since} fork:false"
     if language:
