@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # ─── Auth Schemas ────────────────────────────────────────────
 
@@ -36,8 +36,7 @@ class UserPublic(BaseModel):
     skill_last_updated: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SkillFingerprint(BaseModel):
@@ -63,8 +62,7 @@ class RepositoryPublic(BaseModel):
     primary_language: Optional[str] = None
     topics: Optional[List[str]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── Issue Schemas ───────────────────────────────────────────
@@ -86,8 +84,7 @@ class IssuePublic(BaseModel):
     created_at: Optional[datetime] = None
     repository: Optional[RepositoryPublic] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MatchedIssue(BaseModel):

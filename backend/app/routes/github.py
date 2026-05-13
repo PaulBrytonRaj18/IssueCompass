@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ async def analyze_github_profile(
     # Update user
     current_user.skill_json = fingerprint
     current_user.skill_vector = skill_vector
-    current_user.skill_last_updated = datetime.utcnow()
+    current_user.skill_last_updated = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(current_user)

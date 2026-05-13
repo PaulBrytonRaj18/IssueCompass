@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,7 @@ settings = get_settings()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
@@ -38,7 +38,7 @@ async def get_current_user(
         user_id: int = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+    except jwt.PyJWTError:
         raise credentials_exception
 
     result = await db.execute(select(User).where(User.id == int(user_id)))
@@ -70,7 +70,7 @@ async def github_callback(
         user.github_bio = github_data.github_bio
         user.public_repos = github_data.public_repos
         user.followers = github_data.followers
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
     else:
         # Create new user
         user = User(
@@ -116,7 +116,7 @@ async def refresh_token(
     """Refresh the access token. Returns a new JWT."""
     token = authorization.replace("Bearer ", "")
     user = await get_current_user(token, db)
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     await db.commit()
     new_token = create_access_token({"sub": str(user.id)})
     return TokenResponse(
