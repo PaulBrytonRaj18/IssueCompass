@@ -26,57 +26,6 @@ OpenIssue analyzes your **actual GitHub activity** to build a personal skill fin
 GitHub Login  →  Fetch repos & activity  →  Build skill vector  →  Semantic match  →  Personalized feed
 ```
 
----
-
-## Deploy to Google Cloud Run
-
-Two separate Cloud Run services — frontend (Next.js) and backend (FastAPI) — deploy independently.
-
-### Prerequisites
-
-- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud` CLI)
-- A Google Cloud project with billing enabled
-- [Artifact Registry](https://cloud.google.com/artifact-registry) API enabled
-- [Cloud Run](https://cloud.google.com/run) API enabled
-- A [Supabase](https://supabase.com) project (PostgreSQL + pgvector)
-- A [GitHub OAuth App](https://github.com/settings/applications/new)
-
-### 1. Set secrets in Secret Manager
-
-```bash
-gcloud secrets create GITHUB_CLIENT_ID --data-file=<(echo -n "your_client_id")
-gcloud secrets create GITHUB_CLIENT_SECRET --data-file=<(echo -n "your_client_secret")
-```
-
-### 2. Deploy with Cloud Build
-
-Create a Cloud Build trigger pointing to your repo, or run manually:
-
-```bash
-gcloud builds submit --config cloudbuild.yaml \
-  --substitutions=\
-_DATABASE_URL="postgresql://postgres:pass@db.xxx.supabase.co:6543/postgres",\
-_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')",\
-_GITHUB_TOKEN="ghp_your_token",\
-_FRONTEND_URL="https://openissue-frontend-xxxxx-uc.a.run.app",\
-_NEXT_PUBLIC_API_URL="https://openissue-backend-xxxxx-uc.a.run.app",\
-_NEXTAUTH_URL="https://openissue-frontend-xxxxx-uc.a.run.app",\
-_NEXTAUTH_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
-```
-
-### 3. Update GitHub OAuth callback
-
-Set the callback URL in your GitHub OAuth App to:
-```
-https://openissue-frontend-xxxxx-uc.a.run.app/api/auth/callback/github
-```
-
-### 4. Enable pgvector in Supabase
-
-In your Supabase dashboard → Database → Extensions → enable `vector`.
-
----
-
 ## Testing
 
 ```bash

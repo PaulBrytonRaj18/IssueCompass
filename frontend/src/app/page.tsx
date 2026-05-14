@@ -3,6 +3,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Github, Zap, Target, BarChart3, ArrowRight, Star, GitFork } from "lucide-react";
+import { Analytics } from "@vercel/analytics/next";
 
 const DEMO_MATCHES = [
   {
