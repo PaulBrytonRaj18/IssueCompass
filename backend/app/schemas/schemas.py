@@ -109,4 +109,62 @@ class PlatformStats(BaseModel):
     total_matches_made: int
 
 
+# ─── Search & Trending Schemas ──────────────────────────────
+
+class SearchResult(BaseModel):
+    matches: List[MatchedIssue]
+    total: int
+    query: str
+
+
+class SmartSearchResult(BaseModel):
+    matches: List[MatchedIssue]
+    total: int
+    query: str
+    intent: Optional[Dict[str, Any]] = None
+    personalized: bool = False
+
+
+class TrendingResult(BaseModel):
+    matches: List[MatchedIssue]
+    total: int
+    language: Optional[str] = None
+
+
+# ─── Saved Search Schemas ───────────────────────────────────
+
+class SavedSearchCreate(BaseModel):
+    name: str
+    query: str
+    filters: Optional[Dict[str, Any]] = None
+    notify: bool = False
+
+
+class SavedSearchUpdate(BaseModel):
+    name: Optional[str] = None
+    notify: Optional[bool] = None
+
+
+class SavedSearchPublic(BaseModel):
+    id: int
+    name: str
+    query: str
+    filters: Optional[Dict[str, Any]] = None
+    notify: bool = False
+    created_at: datetime
+    last_checked_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SuggestionItem(BaseModel):
+    type: str
+    text: str
+    description: Optional[str] = None
+
+
+class SuggestionResult(BaseModel):
+    suggestions: List[SuggestionItem]
+
+
 TokenResponse.model_rebuild()

@@ -59,6 +59,20 @@ export const issuesApi = {
     offset?: number;
   }) => api.get("/issues/matches", { params }),
 
+  search: (params: {
+    q: string;
+    language?: string;
+    difficulty?: string;
+    label?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get("/issues/search", { params }),
+
+  getTrending: (params?: {
+    language?: string;
+    limit?: number;
+  }) => api.get("/issues/trending", { params }),
+
   triggerIndex: (languages?: string[]) =>
     api.post("/issues/index", null, {
       params: { languages: languages?.join(",") },
@@ -72,6 +86,45 @@ export const issuesApi = {
 
   getStats: () =>
     api.get("/issues/stats"),
+
+  smartSearch: (params: {
+    q: string;
+    language?: string;
+    difficulty?: string;
+    label?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get("/issues/smart-search", { params }),
+};
+
+// ─── Saved Searches ────────────────────────────────────────────
+export const searchesApi = {
+  getSuggestions: (q: string) =>
+    api.get("/searches/suggestions", { params: { q } }),
+
+  saveSearch: (data: {
+    name: string;
+    query: string;
+    filters?: Record<string, unknown>;
+    notify?: boolean;
+  }) => api.post("/searches/save", data),
+
+  listSearches: () =>
+    api.get("/searches/"),
+
+  getSearch: (id: number) =>
+    api.get(`/searches/${id}`),
+
+  updateSearch: (id: number, data: {
+    name?: string;
+    notify?: boolean;
+  }) => api.put(`/searches/${id}`, data),
+
+  deleteSearch: (id: number) =>
+    api.delete(`/searches/${id}`),
+
+  checkSearch: (id: number) =>
+    api.post(`/searches/${id}/check`),
 };
 
 export default api;

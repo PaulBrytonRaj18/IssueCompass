@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import jwt as jose_jwt
 from app.core.config import get_settings
 from app.core.database import init_db
-from app.routes import auth, github, issues
+from app.routes import auth, github, issues, searches
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -110,6 +110,7 @@ API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(github.router, prefix=API_PREFIX)
 app.include_router(issues.router, prefix=API_PREFIX)
+app.include_router(searches.router, prefix=API_PREFIX)
 
 
 @app.get("/")

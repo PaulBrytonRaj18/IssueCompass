@@ -1,14 +1,14 @@
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Issue, Repository, User
+from app.services import scoring_service
 
 
 def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
-    """Compute cosine similarity between two vectors."""
     a = np.array(vec_a, dtype=np.float32)
     b = np.array(vec_b, dtype=np.float32)
     norm_a = np.linalg.norm(a)
@@ -18,46 +18,21 @@ def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
-def explain_match(
+def find_matching_skills(
     user_skills: Dict[str, Any],
     issue_skills: Dict[str, Any],
-    match_score: float,
-) -> tuple[List[str], str]:
-    """
-    Generate human-readable match explanation.
-    Returns (matching_skills_list, why_matched_sentence)
-    """
+) -> List[str]:
     user_langs = set(user_skills.get("languages", {}).keys())
     user_topics = set(user_skills.get("topics", []))
     user_top = set(user_skills.get("top_skills", []))
 
     issue_cats = issue_skills.get("categories", {})
-    issue_labels = issue_skills.get("labels", [])
-
-    # Find overlapping skills
     matching = set()
     for cat_skills in issue_cats.values():
         for skill in cat_skills:
             if skill in user_langs or skill in user_topics or skill in user_top:
                 matching.add(skill)
-
-    matching_list = list(matching)[:5]
-
-    # Build explanation sentence
-    if match_score > 0.8:
-        strength = "Strong match"
-    elif match_score > 0.5:
-        strength = "Good match"
-    else:
-        strength = "Partial match"
-
-    if matching_list:
-        why = f"{strength} — your skills in {', '.join(matching_list[:3])} align with this issue."
-    else:
-        label_str = ", ".join(issue_labels[:2]) if issue_labels else "general"
-        why = f"{strength} — this {label_str} issue fits your experience level."
-
-    return matching_list, why
+    return list(matching)[:5]
 
 
 async def get_matched_issues(
@@ -68,14 +43,9 @@ async def get_matched_issues(
     language_filter: Optional[str] = None,
     label_filter: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    Find the best matching issues for a user using vector similarity.
-    Falls back to keyword matching if user has no skill vector.
-    """
     user_skill_json = user.skill_json or {}
     user_vector = user.skill_vector
 
-    # Build query
     query = (
         select(Issue, Repository)
         .join(Repository, Issue.repository_id == Repository.id)
@@ -103,33 +73,50 @@ async def get_matched_issues(
     if not rows:
         return []
 
-    # Score each issue
     scored = []
     for issue, repo in rows:
         if user_vector is not None and issue.skill_vector is not None:
-            score = cosine_similarity(user_vector, issue.skill_vector)
+            skill_sim = cosine_similarity(user_vector, issue.skill_vector)
         else:
-            # Fallback: keyword overlap scoring
-            score = _keyword_score(user_skill_json, issue)
+            skill_sim = _keyword_score(user_skill_json, issue)
 
+        repo_activity = scoring_service.compute_repo_activity_score(repo)
+        freshness = scoring_service.compute_freshness_score(issue)
         issue_skills = issue.required_skills or {}
-        matching_skills, why = explain_match(user_skill_json, issue_skills, score)
+        interest_match = scoring_service.compute_interest_match(user_skill_json, issue_skills)
+        popularity = scoring_service.compute_popularity_score(issue, repo)
+
+        final_score = scoring_service.compute_final_score(
+            skill_similarity=skill_sim,
+            repo_activity=repo_activity,
+            freshness=freshness,
+            interest_match=interest_match,
+            popularity=popularity,
+        )
+
+        matching_skills = find_matching_skills(user_skill_json, issue_skills)
+        why = scoring_service.explain_score(
+            skill_similarity=skill_sim,
+            repo_activity=repo_activity,
+            freshness=freshness,
+            interest_match=interest_match,
+            popularity=popularity,
+            matching_skills=matching_skills,
+        )
 
         scored.append({
             "issue": issue,
             "repository": repo,
-            "match_score": round(score, 4),
+            "match_score": round(final_score, 4),
             "matching_skills": matching_skills,
             "why_matched": why,
         })
 
-    # Sort by match score descending, then paginate
     scored.sort(key=lambda x: x["match_score"], reverse=True)
     return scored[offset:offset + limit]
 
 
 def _keyword_score(user_skills: Dict[str, Any], issue: Issue) -> float:
-    """Simple keyword overlap fallback when vectors aren't available."""
     user_langs = set(user_skills.get("languages", {}).keys())
     user_topics = set(user_skills.get("topics", []))
     all_user_skills = user_langs | user_topics
@@ -144,3 +131,63 @@ def _keyword_score(user_skills: Dict[str, Any], issue: Issue) -> float:
 
     total = max(len(all_user_skills), 1)
     return min(matches / total, 1.0)
+
+
+async def search_issues_keyword(
+    db: AsyncSession,
+    query: str,
+    language_filter: Optional[str] = None,
+    difficulty: Optional[str] = None,
+    label_filter: Optional[str] = None,
+    limit: int = 30,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    conditions = [Issue.state == "open"]
+
+    if query:
+        like_pattern = f"%{query}%"
+        conditions.append(
+            or_(
+                Issue.title.ilike(like_pattern),
+                Issue.body.ilike(like_pattern),
+            )
+        )
+
+    if language_filter:
+        conditions.append(Repository.primary_language.ilike(language_filter))
+
+    if difficulty == "beginner":
+        conditions.append(Issue.complexity_score < 0.35)
+    elif difficulty == "intermediate":
+        conditions.append(Issue.complexity_score.between(0.35, 0.65))
+    elif difficulty == "advanced":
+        conditions.append(Issue.complexity_score > 0.65)
+
+    if label_filter == "good_first":
+        conditions.append(Issue.is_good_first_issue.is_(True))
+    elif label_filter == "help_wanted":
+        conditions.append(Issue.is_help_wanted.is_(True))
+
+    query_stmt = (
+        select(Issue, Repository)
+        .join(Repository, Issue.repository_id == Repository.id)
+        .where(and_(*conditions))
+        .order_by(Issue.updated_at.desc().nullslast())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    result = await db.execute(query_stmt)
+    rows = result.fetchall()
+
+    scored = []
+    for issue, repo in rows:
+        scored.append({
+            "issue": issue,
+            "repository": repo,
+            "match_score": 0.5,
+            "matching_skills": [],
+            "why_matched": f"Matched your search: {query}" if query else "All open issues",
+        })
+
+    return scored

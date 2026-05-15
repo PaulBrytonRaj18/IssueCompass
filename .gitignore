@@ -70,3 +70,7 @@ htmlcov/
 *.tmp
 *.orig
 *.rej
+
+
+
+/reference

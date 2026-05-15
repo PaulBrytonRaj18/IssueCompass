@@ -70,6 +70,52 @@ export interface PlatformStats {
   total_repos_indexed: number;
 }
 
+export interface SearchResult {
+  matches: MatchedIssue[];
+  total: number;
+  query: string;
+}
+
+export interface TrendingResult {
+  matches: MatchedIssue[];
+  total: number;
+  language: string | null;
+}
+
+export interface SmartSearchResult {
+  matches: MatchedIssue[];
+  total: number;
+  query: string;
+  intent: {
+    keywords: string[];
+    languages: string[];
+    difficulty: string | null;
+    labels: string[];
+    categories: string[];
+  } | null;
+  personalized: boolean;
+}
+
+export interface SavedSearch {
+  id: number;
+  name: string;
+  query: string;
+  filters: Record<string, unknown> | null;
+  notify: boolean;
+  created_at: string;
+  last_checked_at: string | null;
+}
+
+export interface SuggestionItem {
+  type: string;
+  text: string;
+  description: string | null;
+}
+
+export interface SuggestionResult {
+  suggestions: SuggestionItem[];
+}
+
 // Complexity label
 export function complexityLabel(score: number): string {
   if (score < 0.35) return "Beginner";

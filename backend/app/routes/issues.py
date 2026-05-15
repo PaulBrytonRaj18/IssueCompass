@@ -4,15 +4,24 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_delete_pattern, cache_get, cache_set
 from app.core.database import AsyncSessionLocal, get_db
 from app.models.models import Issue, Repository, SavedIssue, User
 from app.routes.auth import get_current_user
-from app.schemas.schemas import IssueMatchResponse, IssuePublic, MatchedIssue, RepositoryPublic
-from app.services import github_service, matching_service, skill_service
+from app.schemas.schemas import (
+    IssueMatchResponse,
+    IssuePublic,
+    MatchedIssue,
+    RepositoryPublic,
+    SearchResult,
+    SmartSearchResult,
+    TrendingResult,
+)
+from app.services import github_service, matching_service, search_service, skill_service
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +40,11 @@ async def get_matched_issues(
     """Get personalized issue matches for the current user."""
     token = authorization.replace("Bearer ", "")
     user = await get_current_user(token, db)
+
+    cache_key = f"matches:{user.id}:{language or ''}:{label or ''}:{limit}:{offset}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return IssueMatchResponse(**cached)
 
     matches_raw = await matching_service.get_matched_issues(
         db=db,
@@ -88,11 +102,13 @@ async def get_matched_issues(
         except Exception:
             pass
 
-    return IssueMatchResponse(
+    response = IssueMatchResponse(
         matches=matches,
         total=len(matches),
         user_skills=user_skills,
     )
+    await cache_set(cache_key, response.model_dump(), ttl=300)
+    return response
 
 
 @router.post("/index")
@@ -123,7 +139,8 @@ async def _index_issues_background(languages: List[str]):
     ]
     results = await asyncio.gather(*tasks)
     total = sum(results)
-    logger.info("Indexing complete: %d items processed", total)
+    await cache_delete_pattern("trending:*")
+    logger.info("Indexing complete: %d items processed, cache invalidated", total)
 
 
 async def _index_one(language: str, label: str) -> int:
@@ -331,6 +348,341 @@ async def get_saved_issues(
             )
         )
     return issues
+
+
+@router.get("/search", response_model=SearchResult)
+async def search_issues(
+    q: str = Query(..., min_length=1, description="Free-text search query"),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    difficulty: Optional[str] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
+    label: Optional[str] = Query(None, description="Filter by label: good_first, help_wanted"),
+    limit: int = Query(30, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search indexed issues by keyword with filters. Falls back to GitHub API if local results are sparse."""
+    cache_key = f"search:{q}:{language or ''}:{difficulty or ''}:{label or ''}:{limit}:{offset}"
+
+    cached = await cache_get(cache_key)
+    if cached:
+        return SearchResult(**cached)
+
+    matches_raw = await matching_service.search_issues_keyword(
+        db=db,
+        query=q,
+        language_filter=language,
+        difficulty=difficulty,
+        label_filter=label,
+        limit=limit,
+        offset=offset,
+    )
+
+    if len(matches_raw) < 5:
+        github_results = await github_service.search_issues_free_text(
+            query=q, language=language, per_page=limit
+        )
+        github_items = github_results.get("items", [])
+        existing_ids = {m["issue"].github_id for m in matches_raw}
+
+        for item in github_items:
+            if item["id"] in existing_ids:
+                continue
+            repo_data = item.get("repository") or {}
+            matches_raw.append({
+                "issue": Issue(
+                    github_id=item["id"],
+                    number=item["number"],
+                    title=item.get("title", ""),
+                    body=(item.get("body") or "")[:2000],
+                    html_url=item["html_url"],
+                    state="open",
+                    labels=[lb["name"] for lb in item.get("labels", [])],
+                    is_good_first_issue=any("good first" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
+                    is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
+                    comments=item.get("comments", 0),
+                    created_at=_parse_dt(item.get("created_at")),
+                    updated_at=_parse_dt(item.get("updated_at")),
+                    complexity_score=0.5,
+                ),
+                "repository": Repository(
+                    full_name=repo_data.get("full_name", ""),
+                    name=(repo_data.get("full_name") or "").split("/")[-1],
+                    owner_login=(repo_data.get("full_name") or "").split("/")[0] if repo_data.get("full_name") else "",
+                    html_url=repo_data.get("html_url", ""),
+                    stars=repo_data.get("stargazers_count", 0),
+                    primary_language=repo_data.get("language"),
+                    description=repo_data.get("description"),
+                ),
+                "match_score": 0.5,
+                "matching_skills": [],
+                "why_matched": f"GitHub result for: {q}",
+            })
+
+    matches = []
+    for m in matches_raw:
+        issue = m["issue"]
+        repo = m["repository"]
+        matches.append(
+            MatchedIssue(
+                issue=IssuePublic(
+                    id=getattr(issue, "id", 0),
+                    github_id=getattr(issue, "github_id", 0),
+                    number=getattr(issue, "number", 0),
+                    title=issue.title,
+                    body=getattr(issue, "body", None),
+                    html_url=issue.html_url,
+                    state=getattr(issue, "state", "open"),
+                    labels=getattr(issue, "labels", []),
+                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
+                    is_help_wanted=getattr(issue, "is_help_wanted", False),
+                    required_skills=getattr(issue, "required_skills", None),
+                    complexity_score=getattr(issue, "complexity_score", 0.5),
+                    comments=getattr(issue, "comments", 0),
+                    created_at=getattr(issue, "created_at", None),
+                    repository=RepositoryPublic(
+                        id=getattr(repo, "id", 0),
+                        full_name=repo.full_name,
+                        name=getattr(repo, "name", ""),
+                        description=getattr(repo, "description", None),
+                        owner_login=repo.owner_login,
+                        html_url=repo.html_url,
+                        stars=getattr(repo, "stars", 0),
+                        primary_language=getattr(repo, "primary_language", None),
+                        topics=getattr(repo, "topics", None),
+                    ),
+                ),
+                match_score=m["match_score"],
+                matching_skills=m["matching_skills"],
+                why_matched=m["why_matched"],
+            )
+        )
+
+    result = SearchResult(matches=matches, total=len(matches), query=q)
+    await cache_set(cache_key, result.model_dump(), ttl=1800)
+    return result
+
+
+@router.get("/trending", response_model=TrendingResult)
+async def get_trending_issues(
+    language: Optional[str] = Query(None, description="Filter trending by language"),
+    limit: int = Query(20, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return trending issues from active repositories."""
+    cache_key = f"trending:{language or 'all'}:{limit}"
+
+    cached = await cache_get(cache_key)
+    if cached:
+        return TrendingResult(**cached)
+
+    trending_repos = await github_service.search_trending_repos(
+        language=language, per_page=min(limit, 30)
+    )
+
+    if not trending_repos:
+        return TrendingResult(matches=[], total=0, language=language)
+
+    matches_raw = []
+    for repo_data in trending_repos[:10]:
+        full_name = repo_data.get("full_name", "")
+        if not full_name:
+            continue
+
+        result = await db.execute(
+            select(Issue, Repository)
+            .join(Repository, Issue.repository_id == Repository.id)
+            .where(
+                and_(
+                    Repository.full_name == full_name,
+                    Issue.state == "open",
+                    Issue.is_good_first_issue.is_(True),
+                )
+            )
+            .order_by(Issue.updated_at.desc().nullslast())
+            .limit(5)
+        )
+        rows = result.fetchall()
+
+        if rows:
+            for issue, repo in rows:
+                matches_raw.append({
+                    "issue": issue,
+                    "repository": repo,
+                    "match_score": 0.0,
+                    "matching_skills": [],
+                    "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                })
+        else:
+            github_issues = await github_service.fetch_issues_for_repo(
+                full_name=full_name, labels="good first issue", per_page=3
+            )
+            for item in github_issues:
+                matches_raw.append({
+                    "issue": Issue(
+                        github_id=item["id"],
+                        number=item["number"],
+                        title=item.get("title", ""),
+                        body=(item.get("body") or "")[:2000],
+                        html_url=item["html_url"],
+                        state="open",
+                        labels=[lb["name"] for lb in item.get("labels", [])],
+                        is_good_first_issue=True,
+                        is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
+                        comments=item.get("comments", 0),
+                        created_at=_parse_dt(item.get("created_at")),
+                        updated_at=_parse_dt(item.get("updated_at")),
+                        complexity_score=0.5,
+                    ),
+                    "repository": Repository(
+                        full_name=full_name,
+                        name=full_name.split("/")[-1],
+                        owner_login=full_name.split("/")[0],
+                        html_url=repo_data.get("html_url", f"https://github.com/{full_name}"),
+                        stars=repo_data.get("stargazers_count", 0),
+                        primary_language=repo_data.get("language"),
+                        description=repo_data.get("description"),
+                    ),
+                    "match_score": 0.0,
+                    "matching_skills": [],
+                    "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                })
+
+    matches = []
+    for m in matches_raw:
+        issue = m["issue"]
+        repo = m["repository"]
+        matches.append(
+            MatchedIssue(
+                issue=IssuePublic(
+                    id=getattr(issue, "id", 0),
+                    github_id=getattr(issue, "github_id", 0),
+                    number=getattr(issue, "number", 0),
+                    title=issue.title,
+                    body=getattr(issue, "body", None),
+                    html_url=issue.html_url,
+                    state=getattr(issue, "state", "open"),
+                    labels=getattr(issue, "labels", []),
+                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
+                    is_help_wanted=getattr(issue, "is_help_wanted", False),
+                    required_skills=getattr(issue, "required_skills", None),
+                    complexity_score=getattr(issue, "complexity_score", 0.5),
+                    comments=getattr(issue, "comments", 0),
+                    created_at=getattr(issue, "created_at", None),
+                    repository=RepositoryPublic(
+                        id=getattr(repo, "id", 0),
+                        full_name=repo.full_name,
+                        name=getattr(repo, "name", ""),
+                        description=getattr(repo, "description", None),
+                        owner_login=repo.owner_login,
+                        html_url=repo.html_url,
+                        stars=getattr(repo, "stars", 0),
+                        primary_language=getattr(repo, "primary_language", None),
+                        topics=getattr(repo, "topics", None),
+                    ),
+                ),
+                match_score=m["match_score"],
+                matching_skills=m["matching_skills"],
+                why_matched=m["why_matched"],
+            )
+        )
+
+    result = TrendingResult(matches=matches[:limit], total=len(matches[:limit]), language=language)
+    await cache_set(cache_key, result.model_dump(), ttl=3600)
+    return result
+
+
+@router.get("/smart-search", response_model=SmartSearchResult)
+async def smart_search_issues(
+    q: str = Query(..., min_length=1, description="Natural language search query"),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    difficulty: Optional[str] = Query(None, description="Filter by difficulty"),
+    label: Optional[str] = Query(None, description="Filter by label"),
+    limit: int = Query(30, le=100),
+    offset: int = Query(0, ge=0),
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Smart search with natural language understanding + optional personalization."""
+    user = None
+    if authorization:
+        try:
+            token = authorization.replace("Bearer ", "")
+            user = await get_current_user(token, db)
+        except Exception:
+            pass
+
+    cache_key = f"smart:{q}:{language or ''}:{difficulty or ''}:{label or ''}:{limit}:{offset}:{'auth' if user else 'anon'}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return SmartSearchResult(**cached)
+
+    matches_raw = await search_service.smart_search(
+        db=db,
+        query=q,
+        user=user,
+        language_filter=language,
+        difficulty=difficulty,
+        label_filter=label,
+        limit=limit,
+        offset=offset,
+        use_semantic=True,
+    )
+
+    intent = search_service.parse_natural_query(q)
+    matches = []
+    for m in matches_raw:
+        issue = m["issue"]
+        repo = m["repository"]
+        matches.append(
+            MatchedIssue(
+                issue=IssuePublic(
+                    id=getattr(issue, "id", 0),
+                    github_id=getattr(issue, "github_id", 0),
+                    number=getattr(issue, "number", 0),
+                    title=issue.title,
+                    body=getattr(issue, "body", None),
+                    html_url=issue.html_url,
+                    state=getattr(issue, "state", "open"),
+                    labels=getattr(issue, "labels", []),
+                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
+                    is_help_wanted=getattr(issue, "is_help_wanted", False),
+                    required_skills=getattr(issue, "required_skills", None),
+                    complexity_score=getattr(issue, "complexity_score", 0.5),
+                    comments=getattr(issue, "comments", 0),
+                    created_at=getattr(issue, "created_at", None),
+                    repository=RepositoryPublic(
+                        id=getattr(repo, "id", 0),
+                        full_name=repo.full_name,
+                        name=getattr(repo, "name", ""),
+                        description=getattr(repo, "description", None),
+                        owner_login=repo.owner_login,
+                        html_url=repo.html_url,
+                        stars=getattr(repo, "stars", 0),
+                        primary_language=getattr(repo, "primary_language", None),
+                        topics=getattr(repo, "topics", None),
+                    ),
+                ),
+                match_score=m["match_score"],
+                matching_skills=m["matching_skills"],
+                why_matched=m["why_matched"],
+            )
+        )
+
+    result = SmartSearchResult(
+        matches=matches,
+        total=len(matches),
+        query=q,
+        intent={
+            "keywords": intent.keywords,
+            "languages": intent.languages,
+            "difficulty": intent.difficulty,
+            "labels": intent.labels,
+            "categories": intent.categories,
+        },
+        personalized=user is not None,
+    )
+    await cache_set(cache_key, result.model_dump(), ttl=600)
+    return result
 
 
 @router.get("/stats")

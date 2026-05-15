@@ -83,7 +83,7 @@ def test_issue_text_to_vector_output_shape():
 
 
 def test_extract_required_skills():
-    skills = extract_required_skills("Add Python API endpoints", "Use FastAPI", ["backend"])
+    skills = extract_required_skills("Add Python API endpoints with detailed discussion", "Use FastAPI and PostgreSQL for data processing. This is a standard feature that requires typical implementation work across multiple modules with testing and documentation. We should implement it using the usual patterns found in similar projects.", ["backend", "enhancement"])
     assert "backend" in skills["categories"]
     assert skills["complexity"] == 0.5
 

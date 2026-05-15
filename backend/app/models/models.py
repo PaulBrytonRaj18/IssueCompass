@@ -45,6 +45,7 @@ class User(Base):
 
     # Relationships
     saved_issues: Mapped[List["SavedIssue"]] = relationship("SavedIssue", back_populates="user")
+    saved_searches: Mapped[List["SavedSearch"]] = relationship("SavedSearch", back_populates="user")
 
 
 class Repository(Base):
@@ -116,3 +117,18 @@ class SavedIssue(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="saved_issues")
     issue: Mapped["Issue"] = relationship("Issue", back_populates="saved_by")
+
+
+class SavedSearch(Base):
+    __tablename__ = "saved_searches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    query: Mapped[str] = mapped_column(String(500))
+    filters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    notify: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship("User")

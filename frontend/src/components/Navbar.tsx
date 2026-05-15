@@ -1,14 +1,17 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Github, LayoutDashboard, Bookmark, LogOut, User } from "lucide-react";
-import { useState } from "react";
+import { Github, LayoutDashboard, Bookmark, LogOut, User, Search, TrendingUp, Save } from "lucide-react";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={15} /> },
+  { href: "/search", label: "Search", icon: <Search size={15} /> },
+  { href: "/trending", label: "Trending", icon: <TrendingUp size={15} /> },
   { href: "/saved", label: "Saved", icon: <Bookmark size={15} /> },
+  { href: "/searches", label: "Searches", icon: <Save size={15} /> },
   { href: "/profile", label: "Profile", icon: <User size={15} /> },
 ];
 

@@ -1,56 +1,69 @@
-from app.services.matching_service import _keyword_score, cosine_similarity, explain_match
+from app.services import matching_service, scoring_service
 
 
 def test_cosine_similarity_identical():
     a = [1.0, 0.0, 0.0]
     b = [1.0, 0.0, 0.0]
-    assert cosine_similarity(a, b) == 1.0
+    assert matching_service.cosine_similarity(a, b) == 1.0
 
 
 def test_cosine_similarity_orthogonal():
     a = [1.0, 0.0]
     b = [0.0, 1.0]
-    assert cosine_similarity(a, b) == 0.0
+    assert matching_service.cosine_similarity(a, b) == 0.0
 
 
 def test_cosine_similarity_zero_vector():
     a = [0.0, 0.0]
     b = [1.0, 0.0]
-    assert cosine_similarity(a, b) == 0.0
+    assert matching_service.cosine_similarity(a, b) == 0.0
 
 
 def test_cosine_similarity_partial():
     a = [1.0, 1.0]
     b = [1.0, 0.0]
-    result = cosine_similarity(a, b)
+    result = matching_service.cosine_similarity(a, b)
     assert 0.5 < result < 1.0
 
 
-def test_explain_match_strong():
-    user_skills = {"languages": {"python": 1.0}, "topics": ["api"], "top_skills": ["python"]}
-    issue_skills = {"categories": {"backend": ["python", "django"]}, "labels": ["backend"]}
-    matching, why = explain_match(user_skills, issue_skills, 0.9)
-    assert "python" in matching
-    assert "Strong match" in why
+def test_explain_score_strong():
+    text = scoring_service.explain_score(
+        skill_similarity=1.0,
+        repo_activity=1.0,
+        freshness=1.0,
+        interest_match=1.0,
+        popularity=1.0,
+        matching_skills=["python"],
+    )
+    assert "Strong match" in text
+    assert "python" in text
 
 
-def test_explain_match_good():
-    user_skills = {"languages": {"python": 1.0}, "topics": [], "top_skills": ["python"]}
-    issue_skills = {"categories": {"backend": ["python"]}, "labels": []}
-    matching, why = explain_match(user_skills, issue_skills, 0.6)
-    assert "python" in matching
-    assert "Good match" in why
+def test_explain_score_good():
+    text = scoring_service.explain_score(
+        skill_similarity=0.7,
+        repo_activity=0.5,
+        freshness=0.5,
+        interest_match=0.5,
+        popularity=0.5,
+        matching_skills=["python"],
+    )
+    assert "Good match" in text
 
 
-def test_explain_match_partial():
-    user_skills = {"languages": {"java": 1.0}, "topics": [], "top_skills": ["java"]}
-    issue_skills = {"categories": {"backend": ["python"]}, "labels": ["good first issue"]}
-    matching, why = explain_match(user_skills, issue_skills, 0.3)
-    assert "Partial match" in why
+def test_explain_score_partial():
+    text = scoring_service.explain_score(
+        skill_similarity=0.2,
+        repo_activity=0.0,
+        freshness=0.1,
+        interest_match=0.0,
+        popularity=0.0,
+        matching_skills=[],
+    )
+    assert "Partial match" in text
 
 
 def test_keyword_score_match():
-
     from app.models.models import Issue
     issue = Issue(
         id=1,
@@ -61,7 +74,7 @@ def test_keyword_score_match():
         html_url="https://example.com",
     )
     user_skills = {"languages": {"python": 1.0, "django": 0.5}, "topics": ["api"]}
-    score = _keyword_score(user_skills, issue)
+    score = matching_service._keyword_score(user_skills, issue)
     assert score > 0
 
 
@@ -76,5 +89,5 @@ def test_keyword_score_no_match():
         html_url="https://example.com",
     )
     user_skills = {"languages": {"python": 1.0}, "topics": ["web"]}
-    score = _keyword_score(user_skills, issue)
+    score = matching_service._keyword_score(user_skills, issue)
     assert score == 0

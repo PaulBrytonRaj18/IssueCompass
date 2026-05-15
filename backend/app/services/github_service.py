@@ -122,6 +122,35 @@ async def search_issues_global(
         return {"items": [], "total_count": 0}
 
 
+async def search_issues_free_text(
+    query: str,
+    language: Optional[str] = None,
+    per_page: int = 30,
+    page: int = 1,
+) -> Dict[str, Any]:
+    """Search GitHub issues by free text query."""
+    q = f'{query} state:open'
+    if language:
+        q += f" language:{language}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{settings.GITHUB_API_BASE}/search/issues",
+            headers=HEADERS,
+            params={
+                "q": q,
+                "sort": "updated",
+                "order": "desc",
+                "per_page": per_page,
+                "page": page,
+            },
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+        return {"items": [], "total_count": 0}
+
+
 async def search_trending_repos(
     language: Optional[str] = None,
     per_page: int = 30,

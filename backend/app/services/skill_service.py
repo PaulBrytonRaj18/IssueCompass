@@ -218,6 +218,40 @@ def issue_text_to_vector(title: str, body: str, labels: List[str]) -> List[float
     return vector.tolist()
 
 
+def _compute_complexity(title: str, body: str, labels: List[str]) -> float:
+    combined = f"{title} {body} {' '.join(labels)}".lower()
+
+    simple_indicators = [
+        "beginner", "easy", "simple", "starter", "first", "good first",
+        "good-first", "low hanging", "trivial", "documentation", "typo",
+        "help wanted", "up-for-grabs", "junior", "entry-level",
+        "quick fix", "small", "minor",
+    ]
+    complex_indicators = [
+        "complex", "advanced", "difficult", "expert", "hard", "challenging",
+        "deep", "major", "core", "architecture", "performance", "security",
+        "refactor", "complicated", "intricate",
+    ]
+
+    simple_count = sum(1 for w in simple_indicators if w in combined)
+    complex_count = sum(1 for w in complex_indicators if w in combined)
+
+    net = complex_count - simple_count
+    if net > 2:
+        return 0.8
+    if net < -1:
+        return 0.2
+
+    # Text heuristics
+    word_count = len(combined.split())
+    if word_count > 300:
+        return 0.65
+    if word_count < 30:
+        return 0.35
+
+    return 0.5
+
+
 def extract_required_skills(title: str, body: str, labels: List[str]) -> Dict[str, Any]:
     """Extract required skills from issue title, body, and labels."""
     combined = f"{title} {body} {' '.join(labels)}".lower()
@@ -228,12 +262,7 @@ def extract_required_skills(title: str, body: str, labels: List[str]) -> Dict[st
         if found:
             detected[category] = found[:5]
 
-    # Estimate complexity
-    complexity = 0.5
-    if any(w in combined for w in ["beginner", "easy", "simple", "starter", "first"]):
-        complexity = 0.2
-    elif any(w in combined for w in ["complex", "advanced", "difficult", "expert"]):
-        complexity = 0.8
+    complexity = _compute_complexity(title, body, labels)
 
     return {
         "categories": detected,
