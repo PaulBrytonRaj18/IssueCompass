@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # CORS
+    # CORS (accepts both ALLOWED_ORIGINS and common misspelling ALLOW_ORIGINS)
     ALLOWED_ORIGINS: str = "http://localhost:3000"
+    ALLOW_ORIGINS: str = ""
     FRONTEND_URL: str = ""
 
     # Metrics

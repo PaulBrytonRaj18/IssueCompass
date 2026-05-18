@@ -1,6 +1,6 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { authApi } from "@/lib/api";
+import { authApi, setAuthToken } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 
 export function useSyncUserToBackend() {
@@ -9,7 +9,10 @@ export function useSyncUserToBackend() {
   return useMutation({
     mutationFn: (data: Parameters<typeof authApi.githubCallback>[0]) =>
       authApi.githubCallback(data).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.access_token) {
+        setAuthToken(data.access_token);
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
     },
     retry: 1,

@@ -88,7 +88,10 @@ async def close_redis() -> None:
     global _redis, _available
     if _redis is not None:
         try:
-            await _redis.aclose()
+            if hasattr(_redis, "aclose"):
+                await _redis.aclose()
+            else:
+                await _redis.close()
         except Exception as e:
             logger.warning("Redis close error: %s", e)
     _redis = None
@@ -311,12 +314,23 @@ async def cache_ttl(key: str) -> int:
 
 
 async def cache_ping() -> bool:
-    """Check Redis connectivity health."""
+    """Check Redis connectivity health. Attempts reconnect if previously down."""
+    global _available
     client = await get_redis()
-    if client is None:
-        return False
+    if client is not None:
+        try:
+            ok = await client.ping()
+            if ok:
+                _available = True
+            return ok
+        except Exception:
+            _available = False
+            return False
+
+    # Redis was previously unavailable — try reconnecting
     try:
-        return await client.ping()
+        await init_redis()
+        return _available
     except Exception:
         return False
 

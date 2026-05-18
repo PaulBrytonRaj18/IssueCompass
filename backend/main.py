@@ -76,7 +76,10 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
-ALLOWED_ORIGINS = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+_allowed_raw = settings.ALLOWED_ORIGINS
+if settings.ALLOW_ORIGINS:
+    _allowed_raw = _allowed_raw + "," + settings.ALLOW_ORIGINS
+ALLOWED_ORIGINS = [o.strip() for o in _allowed_raw.split(",") if o.strip()]
 if settings.FRONTEND_URL:
     ALLOWED_ORIGINS.append(settings.FRONTEND_URL)
 
@@ -96,7 +99,7 @@ app.include_router(searches.router, prefix=API_PREFIX)
 app.include_router(maintainer.router, prefix=API_PREFIX)
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root():
     return {
         "name": "IssueCompass API",
@@ -106,9 +109,16 @@ async def root():
     }
 
 
+@app.head("/", include_in_schema=False)
+@app.head("/health", include_in_schema=False)
+async def root_head():
+    from fastapi.responses import Response
+    return Response(status_code=200)
+
+
 @app.get("/health")
 async def health(request: Request):
-    errors = request.app.state.config_errors
+    errors = list(request.app.state.config_errors)
     req_metrics = get_metrics()
 
     redis_ok = False
@@ -128,12 +138,12 @@ async def health(request: Request):
         pass
 
     if not db_ok:
-        errors = errors + ["Database connection failed"]
+        errors.append("Database connection failed")
     status = "ok"
     if errors:
         status = "degraded"
 
-    result = {
+    result: dict = {
         "status": status,
         "version": settings.APP_VERSION,
         "database": db_ok,

@@ -53,14 +53,3 @@ async def init_db():
         logger.info("Database extension verified")
     except Exception as e:
         logger.warning("Could not create vector extension (managed PG?): %s", e)
-
-    try:
-        from app.models import models  # noqa: F401
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables verified (via create_all)")
-        logger.warning(
-            "Using create_all — production deployments should use: alembic upgrade head"
-        )
-    except Exception as e:
-        logger.info("Table creation deferred to Alembic: %s", e)

@@ -9,6 +9,45 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const TOKEN_STORAGE_KEY = "ic_auth_token";
+
+function _readStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let _authToken: string | null = _readStoredToken();
+
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+  if (typeof window !== "undefined") {
+    try {
+      if (token) {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+      } else {
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+    } catch {
+      /* sessionStorage unavailable */
+    }
+  }
+}
+
+export function getAuthToken(): string | null {
+  return _authToken;
+}
+
+api.interceptors.request.use((config) => {
+  if (_authToken) {
+    config.headers.Authorization = `Bearer ${_authToken}`;
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

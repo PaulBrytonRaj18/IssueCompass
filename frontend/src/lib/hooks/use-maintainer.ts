@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { maintainerApi, authApi } from "@/lib/api";
+import { maintainerApi, authApi, setAuthToken } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { cacheConfig } from "@/lib/query-client";
 
@@ -55,7 +55,10 @@ export function useMaintainerSyncUser() {
       github_id: number;
       github_username: string;
     }) => authApi.githubCallback(data).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.access_token) {
+        setAuthToken(data.access_token);
+      }
       queryClient.invalidateQueries({
         queryKey: queryKeys.maintainer.overview,
       });
