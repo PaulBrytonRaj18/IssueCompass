@@ -34,11 +34,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("CONFIG: all checks passed")
 
-    try:
-        await init_db()
-        logger.info("Database initialized")
-    except Exception as e:
-        logger.warning("Database init failed: %s", e)
+    await init_db()
 
     try:
         await init_redis()

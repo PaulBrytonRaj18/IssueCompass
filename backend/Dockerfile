@@ -37,7 +37,7 @@ USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import http.client; conn=http.client.HTTPConnection('localhost', ${PORT:-8080}); conn.request('GET', '/health'); resp=conn.getresponse(); exit(0 if resp.status==200 else 1)"
 
-CMD alembic upgrade head 2>&1 && exec gunicorn main:app \
+CMD python -m scripts.db_reconcile 2>&1 && alembic upgrade head 2>&1 && exec gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:${PORT:-8080} \
     --workers ${WEB_CONCURRENCY:-2} \
