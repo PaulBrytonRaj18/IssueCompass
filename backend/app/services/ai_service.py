@@ -24,7 +24,27 @@ AI_CACHE_TTL_SKILLS = 86400  # 24 hours for skill analysis
 AI_CACHE_TTL_EMBEDDING = 86400  # 24 hours for embeddings (deterministic)
 
 # In-flight request deduplication: maps cache_key -> asyncio.Task
-_in_flight: Dict[str, "asyncio.Task"] = {}
+_in_flight: Dict[str, "asyncio.Task[Any]"] = {}
+
+# Shared HTTPX client for connection reuse
+_shared_client: Optional[httpx.AsyncClient] = None
+
+# Concurrency limiter for AI API calls (prevent rate limit overwhelm)
+_ai_semaphore = asyncio.Semaphore(5)
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = httpx.AsyncClient(timeout=30.0)
+    return _shared_client
+
+
+async def close_client() -> None:
+    global _shared_client
+    if _shared_client is not None:
+        await _shared_client.aclose()
+        _shared_client = None
 
 SYSTEM_PROMPTS = {
     "skill_analysis": """You are a senior open-source maintainer analyzing a developer's GitHub profile.
@@ -138,7 +158,8 @@ async def _call_groq(
         "response_format": {"type": "json_object"},
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with _ai_semaphore:
+        client = _get_client()
         resp = await client.post(
             f"{_groq_base()}/chat/completions",
             headers=_groq_headers(),
@@ -236,7 +257,8 @@ async def _call_jina_embed(text: str) -> Optional[List[float]]:
         "dimensions": settings.JINA_EMBED_DIMS,
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with _ai_semaphore:
+        client = _get_client()
         resp = await client.post(
             f"{settings.JINA_API_BASE}/embeddings",
             headers={
@@ -244,6 +266,7 @@ async def _call_jina_embed(text: str) -> Optional[List[float]]:
                 "Content-Type": "application/json",
             },
             json=payload,
+            timeout=15.0,
         )
         resp.raise_for_status()
         data = resp.json()

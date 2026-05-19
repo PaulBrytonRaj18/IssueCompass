@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,6 +9,22 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 config = context.config
+
+# ── Load database URL from environment ─────────────────────────
+# Never rely on ConfigParser %(...)s interpolation in alembic.ini;
+# Python's ConfigParser treats that as option references, not env vars.
+_database_url = os.environ.get("DATABASE_URL", "")
+if not _database_url:
+    from app.core.config import get_settings
+
+    _database_url = get_settings().DATABASE_URL
+
+if "+asyncpg" not in _database_url:
+    _database_url = _database_url.replace("postgresql://", "postgresql+asyncpg://")
+
+config.set_main_option("sqlalchemy.url", _database_url)
+
+# ── Logging configuration ─────────────────────────────────────
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -33,7 +50,8 @@ def do_run_migrations(connection):
 
 
 async def run_async_migrations():
-    config_section = config.get_section(config.config_ini_section)
+    config_section = dict(config.get_section(config.config_ini_section))
+    config_section["sqlalchemy.url"] = _database_url
     connectable = async_engine_from_config(
         config_section,
         prefix="sqlalchemy.",

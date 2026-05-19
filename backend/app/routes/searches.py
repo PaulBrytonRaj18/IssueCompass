@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -48,7 +49,7 @@ async def create_saved_search(
         user_id=user.id,
         name=body.name,
         query=body.query,
-        filters=body.filters.model_dump() if body.filters else None,
+        filters=body.filters if isinstance(body.filters, dict) else (body.filters.model_dump() if body.filters else None),
         notify=body.notify,
     )
     db.add(saved)
@@ -184,7 +185,7 @@ async def check_saved_search(
             if r["issue"].created_at and r["issue"].created_at > saved.last_checked_at
         )
 
-    saved.last_checked_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    saved.last_checked_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {

@@ -196,6 +196,15 @@ async def cache_get_with_stale(
         except Exception:
             pass
 
+    # Double-check after potential await (another coroutine may have set it)
+    existing = _in_flight.get(key)
+    if existing is not None:
+        logger.debug("Dedup (retry): waiting for in-flight request: %s", key)
+        try:
+            return await existing
+        except Exception:
+            pass
+
     # Execute and cache
     task = asyncio.create_task(fetcher())
     _in_flight[key] = task
@@ -214,12 +223,11 @@ def _refresh_in_background(key: str, ttl: int, fetcher: Callable) -> None:
             value = await fetcher()
             await cache_set(key, value, ttl=ttl)
             logger.debug("Cache refreshed early: %s", key)
-        except Exception as e:
+        except Exception:
             pass
 
     try:
-        loop = asyncio.get_running_loop()
-        task = asyncio.ensure_future(_refresh(), loop=loop)
+        task = asyncio.create_task(_refresh())
         task.add_done_callback(lambda t: (
             logger.warning("Background refresh %s failed: %s", key, t.exception())
             if t.exception() else None

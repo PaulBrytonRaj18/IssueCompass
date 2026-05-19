@@ -2,6 +2,7 @@
 
 import logging
 import time
+import uuid
 from collections import deque
 from typing import Callable
 
@@ -16,20 +17,37 @@ _request_durations: deque[float] = deque(maxlen=1000)
 
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
-    """Logs every request with method, path, status, and duration."""
+    """Logs every request with method, path, status, and duration.
+    Attaches a unique request_id to each request for traceability."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         global _request_count
         _request_count += 1
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
         start = time.monotonic()
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            duration = time.monotonic() - start
+            _request_durations.append(duration)
+            logger.error(
+                "Unhandled exception [%s] %s %s %.3fs: %s",
+                request_id,
+                request.method,
+                request.url.path,
+                duration,
+                str(exc),
+            )
+            raise
 
         duration = time.monotonic() - start
         _request_durations.append(duration)
 
         logger.info(
-            "%s %s %d %.3fs",
+            "[%s] %s %s %d %.3fs",
+            request_id,
             request.method,
             request.url.path,
             response.status_code,

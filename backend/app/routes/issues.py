@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, select
@@ -344,69 +344,75 @@ async def get_trending_issues(
         return TrendingResult(matches=[], total=0, language=language)
 
     matches_raw = []
-    for repo_data in trending_repos[:10]:
-        full_name = repo_data.get("full_name", "")
-        if not full_name:
-            continue
-
-        result = await db.execute(
+    repo_names = [r.get("full_name") for r in trending_repos[:10] if r.get("full_name")]
+    if repo_names:
+        db_result = await db.execute(
             select(Issue, Repository)
             .join(Repository, Issue.repository_id == Repository.id)
             .where(
                 and_(
-                    Repository.full_name == full_name,
+                    Repository.full_name.in_(repo_names),
                     Issue.state == "open",
                     Issue.is_good_first_issue.is_(True),
                 )
             )
             .order_by(Issue.updated_at.desc().nullslast())
-            .limit(5)
+            .limit(limit)
         )
-        rows = result.fetchall()
+        indexed_rows = db_result.fetchall()
+        indexed_by_repo: Dict[str, List] = {}
+        for issue, repo in indexed_rows:
+            indexed_by_repo.setdefault(repo.full_name, []).append((issue, repo))
 
-        if rows:
-            for issue, repo in rows:
-                matches_raw.append({
-                    "issue": issue,
-                    "repository": repo,
-                    "match_score": 0.0,
-                    "matching_skills": [],
-                    "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
-                })
-        else:
-            github_issues = await github_service.fetch_issues_for_repo(
-                full_name=full_name, labels="good first issue", per_page=3
-            )
-            for item in github_issues:
-                matches_raw.append({
-                    "issue": Issue(
-                        github_id=item["id"],
-                        number=item["number"],
-                        title=item.get("title", ""),
-                        body=(item.get("body") or "")[:2000],
-                        html_url=item["html_url"],
-                        state="open",
-                        labels=[lb["name"] for lb in item.get("labels", [])],
-                        is_good_first_issue=True,
-                        is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                        comments=item.get("comments", 0),
-                        created_at=parse_dt(item.get("created_at")),
-                        updated_at=parse_dt(item.get("updated_at")),
-                        complexity_score=0.5,
-                    ),
-                    "repository": Repository(
-                        full_name=full_name,
-                        name=full_name.split("/")[-1],
-                        owner_login=full_name.split("/")[0],
-                        html_url=repo_data.get("html_url", f"https://github.com/{full_name}"),
-                        stars=repo_data.get("stargazers_count", 0),
-                        primary_language=repo_data.get("language"),
-                        description=repo_data.get("description"),
-                    ),
-                    "match_score": 0.0,
-                    "matching_skills": [],
-                    "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
-                })
+        for repo_data in trending_repos[:10]:
+            full_name = repo_data.get("full_name", "")
+            if not full_name:
+                continue
+
+            rows = indexed_by_repo.get(full_name, [])
+            if rows:
+                for issue, repo in rows:
+                    matches_raw.append({
+                        "issue": issue,
+                        "repository": repo,
+                        "match_score": 0.0,
+                        "matching_skills": [],
+                        "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                    })
+            else:
+                github_issues = await github_service.fetch_issues_for_repo(
+                    full_name=full_name, labels="good first issue", per_page=3
+                )
+                for item in github_issues:
+                    matches_raw.append({
+                        "issue": Issue(
+                            github_id=item["id"],
+                            number=item["number"],
+                            title=item.get("title", ""),
+                            body=(item.get("body") or "")[:2000],
+                            html_url=item["html_url"],
+                            state="open",
+                            labels=[lb["name"] for lb in item.get("labels", [])],
+                            is_good_first_issue=True,
+                            is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
+                            comments=item.get("comments", 0),
+                            created_at=parse_dt(item.get("created_at")),
+                            updated_at=parse_dt(item.get("updated_at")),
+                            complexity_score=0.5,
+                        ),
+                        "repository": Repository(
+                            full_name=full_name,
+                            name=full_name.split("/")[-1],
+                            owner_login=full_name.split("/")[0],
+                            html_url=repo_data.get("html_url", f"https://github.com/{full_name}"),
+                            stars=repo_data.get("stargazers_count", 0),
+                            primary_language=repo_data.get("language"),
+                            description=repo_data.get("description"),
+                        ),
+                        "match_score": 0.0,
+                        "matching_skills": [],
+                        "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                    })
 
     matches = []
     for m in matches_raw:
@@ -473,7 +479,7 @@ async def smart_search_issues(
     if cached:
         return SmartSearchResult(**cached)
 
-    matches_raw = await search_service.smart_search(
+    matches_raw, intent = await search_service.smart_search(
         db=db,
         query=q,
         user=user,
@@ -484,8 +490,6 @@ async def smart_search_issues(
         offset=offset,
         use_semantic=True,
     )
-
-    intent = await search_service.parse_natural_query(q)
     matches = []
     for m in matches_raw:
         issue = m["issue"]

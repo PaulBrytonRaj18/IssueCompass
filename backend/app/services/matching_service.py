@@ -65,7 +65,7 @@ async def get_matched_issues(
     elif label_filter == "help_wanted":
         query = query.where(Issue.is_help_wanted.is_(True))
 
-    pool_size = min(offset + limit * 3, 500)
+    pool_size = min(max(offset + limit, limit * 5), 500)
     query = query.limit(pool_size)
     result = await db.execute(query)
     rows = result.fetchall()
@@ -123,6 +123,7 @@ async def get_matched_issues(
         })
 
     scored.sort(key=lambda x: x["match_score"], reverse=True)
+    total = len(scored)
     return scored[offset:offset + limit]
 
 

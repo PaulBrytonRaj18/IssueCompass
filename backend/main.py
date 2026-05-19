@@ -49,6 +49,16 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("IssueCompass API shutting down")
+    try:
+        from app.services.ai_service import close_client
+        await close_client()
+    except Exception:
+        pass
+    try:
+        from app.services.github_service import close_client
+        await close_client()
+    except Exception:
+        pass
     await close_redis()
 
 
@@ -75,6 +85,25 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
+
+async def _generic_exception_handler(request: Request, exc: Exception):
+    from fastapi.responses import JSONResponse
+    logger.error(
+        "[%s] Unhandled %s on %s %s: %s",
+        getattr(request.state, "request_id", "?"),
+        type(exc).__name__,
+        request.method,
+        request.url.path,
+        str(exc),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error_id": getattr(request.state, "request_id", None)},
+    )
+
+
+app.add_exception_handler(Exception, _generic_exception_handler)
 
 _allowed_raw = settings.ALLOWED_ORIGINS
 if settings.ALLOW_ORIGINS:
@@ -134,8 +163,8 @@ async def health(request: Request):
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
             db_ok = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Healthcheck DB connection failed: %s", e)
 
     if not db_ok:
         errors.append("Database connection failed")

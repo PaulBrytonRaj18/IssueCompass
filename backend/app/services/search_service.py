@@ -170,7 +170,7 @@ async def smart_search(
     limit: int = 30,
     offset: int = 0,
     use_semantic: bool = True,
-) -> List[Dict[str, Any]]:
+) -> tuple[List[Dict[str, Any]], SearchIntent]:
     intent = await parse_natural_query(query)
 
     if language_filter:
@@ -196,7 +196,7 @@ async def smart_search(
         results = re_rank_results(results, user)
 
     results.sort(key=lambda x: x["match_score"], reverse=True)
-    return results[offset:offset + limit]
+    return results[offset:offset + limit], intent
 
 
 async def _db_search(
@@ -262,7 +262,7 @@ async def _db_search(
             "repository": repo,
             "match_score": round(keyword_match, 4),
             "matching_skills": matching_service.find_matching_skills({}, issue_skills),
-            "why_matched": _generate_why(intent, keyword_match, {}),
+            "why_matched": _generate_why(intent, keyword_match),
         })
 
     return scored
@@ -420,7 +420,6 @@ def re_rank_results(
 def _generate_why(
     intent: SearchIntent,
     score: float,
-    extra: Dict[str, Any],
 ) -> str:
     parts = []
     if intent.languages:

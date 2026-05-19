@@ -12,6 +12,7 @@ os.environ["AI_ENABLED"] = "false"
 os.environ["GROQ_API_KEY"] = ""
 os.environ["EMBEDDINGS_ENABLED"] = "false"
 os.environ["JINA_API_KEY"] = ""
+os.environ["METRICS_API_KEY"] = ""
 
 backend_dir = Path(__file__).parent.parent
 if str(backend_dir) not in sys.path:

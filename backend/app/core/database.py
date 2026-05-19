@@ -1,5 +1,6 @@
 import logging
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -19,7 +20,13 @@ engine = create_async_engine(
     pool_size=5,
     max_overflow=5,
     pool_recycle=1800,
-    connect_args={"timeout": 10, "statement_cache_size": 0},
+    pool_timeout=5,
+    connect_args={
+        "timeout": 10,
+        "statement_cache_size": 0,
+        "command_timeout": 30,
+    },
+    isolation_level="READ_COMMITTED",
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -47,9 +54,7 @@ async def init_db():
     """Ensure DB extensions exist. Tables are managed by Alembic migrations."""
     try:
         async with engine.begin() as conn:
-            await conn.execute(
-                __import__("sqlalchemy").text("CREATE EXTENSION IF NOT EXISTS vector")
-            )
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         logger.info("Database extension verified")
     except Exception as e:
         logger.warning("Could not create vector extension (managed PG?): %s", e)

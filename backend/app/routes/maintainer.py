@@ -59,32 +59,41 @@ async def get_maintainer_overview(
     )
     indexed_repos = {r.full_name: r for r in result.scalars().all()}
 
-    maintainer_repos = []
-    for rd in repos_data:
-        full_name = rd["full_name"]
-        if full_name not in indexed_repos:
-            continue
-
-        db_repo = indexed_repos[full_name]
-
-        issues_result = await db.execute(
-            select(
-                func.count(Issue.id),
-                func.sum(func.cast(Issue.is_good_first_issue, func.Integer())),
-                func.sum(func.cast(Issue.is_help_wanted, func.Integer())),
-                func.avg(Issue.complexity_score),
-            ).where(
-                and_(
-                    Issue.repository_id == db_repo.id,
-                    Issue.state == "open",
-                )
-            )
+    if not indexed_repos:
+        return MaintainerOverview(
+            total_repos=0, total_open_issues=0,
+            total_good_first_issues=0, total_help_wanted_issues=0,
+            total_potential_contributors=0, repos=[],
         )
-        row = issues_result.one()
-        total_issues = row[0] or 0
-        gfi_count = row[1] or 0
-        hw_count = row[2] or 0
-        avg_complexity = float(row[3] or 0.0)
+
+    repo_ids = list(indexed_repos.values())
+    issue_stats_result = await db.execute(
+        select(
+            Issue.repository_id,
+            func.count(Issue.id).label("total"),
+            func.sum(func.cast(Issue.is_good_first_issue, func.Integer())).label("gfi"),
+            func.sum(func.cast(Issue.is_help_wanted, func.Integer())).label("hw"),
+            func.avg(Issue.complexity_score).label("avg_cx"),
+        ).where(
+            and_(
+                Issue.repository_id.in_([r.id for r in repo_ids]),
+                Issue.state == "open",
+            )
+        ).group_by(Issue.repository_id)
+    )
+    issue_stats = {
+        row.repository_id: {
+            "total_issues": row.total or 0,
+            "gfi_count": row.gfi or 0,
+            "hw_count": row.hw or 0,
+            "avg_complexity": float(row.avg_cx or 0.0),
+        }
+        for row in issue_stats_result.fetchall()
+    }
+
+    maintainer_repos = []
+    for db_repo in repo_ids:
+        stats = issue_stats.get(db_repo.id, {"total_issues": 0, "gfi_count": 0, "hw_count": 0, "avg_complexity": 0.0})
 
         maintainer_repos.append(
             MaintainerRepo(
@@ -98,10 +107,10 @@ async def get_maintainer_overview(
                 forks=db_repo.forks,
                 primary_language=db_repo.primary_language,
                 open_issues_count=db_repo.open_issues_count,
-                total_issues=total_issues,
-                good_first_issues=gfi_count,
-                help_wanted_issues=hw_count,
-                avg_complexity=avg_complexity,
+                total_issues=stats["total_issues"],
+                good_first_issues=stats["gfi_count"],
+                help_wanted_issues=stats["hw_count"],
+                avg_complexity=stats["avg_complexity"],
             )
         )
 
