@@ -92,6 +92,8 @@ class MatchedIssue(BaseModel):
     match_score: float
     matching_skills: List[str]
     why_matched: str
+    is_live_result: bool = False
+    live_fetched_at: Optional[str] = None
 
 
 class IssueMatchResponse(BaseModel):

@@ -405,13 +405,15 @@ def re_rank_results(
 
         matching_skills = matching_service.find_matching_skills(user_skills, issue_skills)
         r["matching_skills"] = matching_skills
-        r["why_matched"] = scoring_service.explain_score(
+        r["why_matched"] = scoring_service.safe_explain_score(
             skill_similarity=skill_sim,
             repo_activity=repo_activity,
             freshness=freshness,
             interest_match=interest_match,
             popularity=popularity,
             matching_skills=matching_skills,
+            fallback_score=r.get("match_score", 0.5),
+            issue_id=getattr(issue, "github_id", None),
         )
 
     return results

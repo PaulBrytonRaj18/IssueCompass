@@ -138,9 +138,9 @@ def explain_score(
     freshness: float,
     interest_match: float,
     popularity: float,
-    matching_skills: List[str],
+    matching_skills: list[str],
 ) -> str:
-    parts = []
+    parts: list[str] = []
 
     final = compute_final_score(
         skill_similarity=skill_similarity,
@@ -164,7 +164,7 @@ def explain_score(
         skill_str = ", ".join(matching_skills[:3])
         parts.append(f"— your {skill_str} skills align")
 
-    repo_desc = []
+    repo_desc: list[str] = []
     if popularity > 0.7:
         repo_desc.append("highly popular repo")
     elif popularity > 0.4:
@@ -182,3 +182,157 @@ def explain_score(
         parts.append(f"({', '.join(repo_desc)})")
 
     return " ".join(parts)
+
+
+def safe_explain_score(
+    skill_similarity: float | None,
+    repo_activity: float | None,
+    freshness: float | None,
+    interest_match: float | None,
+    popularity: float | None,
+    matching_skills: list[str] | None,
+    fallback_score: float = 0.0,
+    issue_id: object = None,
+) -> str:
+    """
+    Wrapper around explain_score that catches errors and returns a fallback
+    explanation string on failure. Never raises.
+    """
+    try:
+        return explain_score(
+            skill_similarity=skill_similarity or 0.0,
+            repo_activity=repo_activity or 0.0,
+            freshness=freshness or 0.0,
+            interest_match=interest_match or 0.0,
+            popularity=popularity or 0.0,
+            matching_skills=matching_skills or [],
+        )
+    except Exception as exc:
+        logger.warning(
+            "explain_score failed for issue_id=%s: %s",
+            issue_id, exc,
+        )
+        score_pct = round(max(0.0, min(1.0, fallback_score)) * 100)
+        return f"Matched ({score_pct}%)"
+
+
+# ---------------------------------------------------------------------------
+# Live-issue proxy scorer
+# Produces a 0–1 composite for a raw GitHub API issue dict.
+# Called BEFORE the issue is embedded or persisted.
+# ---------------------------------------------------------------------------
+
+def score_live_issue(
+    user_skills: dict,
+    raw_issue: dict,
+    raw_repo: dict,
+) -> float:
+    """
+    Compute a blended 0-1 score for a live GitHub issue that has not yet been
+    embedded or stored in the database.
+    """
+    # Skip pull requests (GitHub search returns PRs in issue search)
+    if raw_issue.get("pull_request"):
+        return 0.0
+
+    user_languages = {k.lower() for k in user_skills.get("languages", {}).keys()}
+    user_topics = {t.lower() for t in user_skills.get("topics", [])}
+    user_top_skills = {s.lower() for s in user_skills.get("top_skills", [])}
+
+    # ── 1. Language match (weight 0.40)
+    repo_language = (raw_repo.get("language") or "").lower()
+    repo_topics = {t.lower() for t in (raw_repo.get("topics") or [])}
+
+    lang_score = 0.0
+    if repo_language and repo_language in user_languages:
+        lang_pct = user_skills.get("languages", {}).get(repo_language, 0)
+        lang_score = min(1.0, 0.5 + lang_pct * 0.5)
+    elif repo_language:
+        lang_score = 0.0
+
+    # ── 2. Topic / interest match (weight 0.20)
+    topic_overlap = len(user_topics & repo_topics)
+    topic_score = min(1.0, topic_overlap * 0.35)
+
+    # ── 3. Label match (weight 0.15)
+    label_names = {lbl["name"].lower() for lbl in raw_issue.get("labels", [])}
+    label_score = 0.0
+    if "good first issue" in label_names:
+        label_score += 0.6
+    if "help wanted" in label_names:
+        label_score += 0.3
+    if "bug" in label_names:
+        label_score += 0.1
+    label_score = min(1.0, label_score)
+
+    # ── 4. Freshness (weight 0.15)
+    updated_str = raw_issue.get("updated_at") or raw_issue.get("created_at", "")
+    freshness_score = 0.2
+    if updated_str:
+        try:
+            updated_dt = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+            age_days = (datetime.now(timezone.utc) - updated_dt).days
+            if age_days <= 7:
+                freshness_score = 1.0
+            elif age_days <= 30:
+                freshness_score = 0.8
+            elif age_days <= 90:
+                freshness_score = 0.5
+            else:
+                freshness_score = 0.2
+        except (ValueError, TypeError):
+            freshness_score = 0.2
+
+    # ── 5. Repo popularity (weight 0.10)
+    stars = raw_repo.get("stargazers_count") or raw_repo.get("stars", 0)
+    forks = raw_repo.get("forks_count") or raw_repo.get("forks", 0)
+    pop_score = 0.0
+    if stars >= 10_000:
+        pop_score += 0.4
+    elif stars >= 1_000:
+        pop_score += 0.25
+    elif stars >= 100:
+        pop_score += 0.1
+    if forks >= 1_000:
+        pop_score += 0.2
+    elif forks >= 100:
+        pop_score += 0.1
+    comments = raw_issue.get("comments", 0)
+    if comments >= 20:
+        pop_score += 0.3
+    elif comments >= 5:
+        pop_score += 0.15
+    pop_score = min(1.0, pop_score)
+
+    # ── Composite (weights must sum to 1.0)
+    composite = (
+        lang_score    * 0.40 +
+        topic_score   * 0.20 +
+        label_score   * 0.15 +
+        freshness_score * 0.15 +
+        pop_score     * 0.10
+    )
+    return round(composite, 4)
+
+
+def build_live_issue_explanation(
+    user_skills: dict,
+    raw_issue: dict,
+    raw_repo: dict,
+    score: float,
+) -> str:
+    """
+    Rule-based explanation string for a live issue (no AI call).
+    """
+    lang = (raw_repo.get("language") or "unknown").lower()
+    pct = int(score * 100)
+    label_names = [lbl["name"] for lbl in raw_issue.get("labels", [])]
+    label_str = ", ".join(label_names[:3]) if label_names else "no labels"
+    stars = raw_repo.get("stargazers_count") or raw_repo.get("stars", 0)
+    repo_name = raw_repo.get("full_name") or raw_repo.get("name", "")
+
+    quality = "Excellent" if score >= 0.8 else "Good" if score >= 0.6 else "Partial"
+    return (
+        f"{quality} match ({pct}%) — {lang} repo '{repo_name}' "
+        f"[{label_str}], {stars:,} stars (live result)"
+    )

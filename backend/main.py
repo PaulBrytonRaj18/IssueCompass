@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
-from app.core.database import init_db
+from app.core.database import close_db, get_pool_status, init_db
 from app.core.monitoring import get_metrics, setup_monitoring
 from app.core.ratelimit import limiter
 from app.routes import auth, github, issues, maintainer, searches
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("IssueCompass API shutting down")
+    await close_db()
     try:
         from app.services.ai_service import close_client
         await close_client()
@@ -176,6 +177,7 @@ async def health(request: Request):
         "ai_enabled": bool(settings.GROQ_API_KEY and settings.AI_ENABLED),
         "metrics": req_metrics,
         "cache": cache_stats(),
+        "pool": await get_pool_status(),
     }
     if errors:
         result["config_errors"] = errors

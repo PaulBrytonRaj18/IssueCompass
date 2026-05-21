@@ -31,6 +31,9 @@ HEADERS = {
 _shared_client: Optional[httpx.AsyncClient] = None
 _gh_rate_remaining: int = 5000  # start optimistic
 
+# Limit concurrent live-fetch queries per request to avoid rate-limit burst
+_LIVE_FETCH_SEMAPHORE = asyncio.Semaphore(4)
+
 
 def _get_client() -> httpx.AsyncClient:
     global _shared_client
@@ -275,3 +278,87 @@ async def search_trending_repos(
         return []
 
     return await _cached_fetch(key, TTL_TRENDING_REPOS, _fetch)
+
+
+async def fetch_live_issues_for_user(
+    skill_json: dict,
+    per_language_limit: int = 15,
+    max_queries: int = 8,
+) -> list[dict]:
+    """
+    Fetch live open issues from GitHub Search that match this user's skill
+    fingerprint. Fires parallel queries (bounded by _LIVE_FETCH_SEMAPHORE)
+    and returns a deduplicated flat list of raw GitHub issue dicts.
+
+    Each returned dict is the raw GitHub Search API issue object with an
+    extra key ``_repo`` containing the repository sub-object for scoring.
+    """
+    if not skill_json:
+        return []
+
+    # ── Rate-limit budget check ───────────────────────────────────────────
+    global _gh_rate_remaining
+    if _gh_rate_remaining < 50:
+        logger.warning(
+            "GitHub rate limit low (%d remaining) — skipping live fetch",
+            _gh_rate_remaining,
+        )
+        return []
+
+    # Build query strings from fingerprint
+    queries: list[str] = []
+
+    top_langs = sorted(
+        skill_json.get("languages", {}).items(),
+        key=lambda kv: kv[1],
+        reverse=True,
+    )[:3]
+
+    for lang, _ in top_langs:
+        queries.append(
+            f'label:"good first issue" language:{lang} state:open is:issue'
+        )
+        queries.append(
+            f'label:"help wanted" language:{lang} state:open is:issue'
+        )
+
+    top_topics = skill_json.get("topics", [])[:2]
+    for topic in top_topics:
+        queries.append(
+            f'topic:{topic} label:"good first issue" state:open is:issue'
+        )
+
+    # Cap at max_queries
+    queries = queries[:max_queries]
+
+    async def _run_query(q: str) -> list[dict]:
+        async with _LIVE_FETCH_SEMAPHORE:
+            try:
+                raw = await search_issues_free_text(
+                    q,
+                    per_page=per_language_limit,
+                )
+                results = raw.get("items", [])
+                # Normalise: attach _repo from the nested repository field
+                enriched = []
+                for issue in results:
+                    repo = issue.get("repository") or {}
+                    issue["_repo"] = repo
+                    enriched.append(issue)
+                return enriched
+            except Exception:
+                return []
+
+    all_results = await asyncio.gather(*[_run_query(q) for q in queries])
+
+    # Flatten and deduplicate by GitHub issue ID
+    seen_ids: set[int] = set()
+    deduped: list[dict] = []
+    for batch in all_results:
+        for issue in batch:
+            issue_id = issue.get("id")
+            if issue_id and issue_id not in seen_ids:
+                seen_ids.add(issue_id)
+                deduped.append(issue)
+
+    return deduped

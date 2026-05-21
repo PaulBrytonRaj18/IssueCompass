@@ -203,3 +203,79 @@ def test_explain_score_partial():
         matching_skills=[],
     )
     assert "Partial match" in text
+
+
+class TestScoreLiveIssue:
+    """Tests for the new proxy scorer for live GitHub issues."""
+
+    BASE_USER_SKILLS = {
+        "languages": {"python": 0.7, "typescript": 0.3},
+        "topics": ["web", "api"],
+        "top_skills": ["fastapi", "react"],
+        "categories": {"backend": 0.6, "frontend": 0.4},
+        "experience_level": "intermediate",
+    }
+
+    BASE_REPO = {
+        "language": "Python",
+        "topics": ["api", "web"],
+        "stargazers_count": 5000,
+        "forks_count": 300,
+        "full_name": "testorg/testrepo",
+        "name": "testrepo",
+        "archived": False,
+    }
+
+    BASE_ISSUE = {
+        "title": "Fix authentication bug",
+        "body": "The login endpoint returns 500 on empty password.",
+        "labels": [{"name": "good first issue"}, {"name": "bug"}],
+        "updated_at": "2025-05-01T00:00:00Z",
+        "created_at": "2025-04-28T00:00:00Z",
+        "comments": 8,
+        "pull_request": None,
+    }
+
+    def test_pull_request_always_scores_zero(self):
+        issue_as_pr = {**self.BASE_ISSUE, "pull_request": {"url": "https://..."}}
+        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_as_pr, self.BASE_REPO)
+        assert score == 0.0
+
+    def test_perfect_language_match_scores_high(self):
+        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
+        assert score >= 0.55, f"Expected strong match, got {score}"
+
+    def test_language_mismatch_scores_lower(self):
+        repo_rust = {**self.BASE_REPO, "language": "Rust", "topics": []}
+        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, repo_rust)
+        assert score <= 0.45, f"Expected weak match for unknown lang, got {score}"
+
+    def test_good_first_issue_label_increases_score(self):
+        issue_no_label = {**self.BASE_ISSUE, "labels": []}
+        score_with    = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
+        score_without = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_no_label, self.BASE_REPO)
+        assert score_with > score_without
+
+    def test_stale_issue_scores_lower_than_fresh(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        old_date = (now - timedelta(days=200)).isoformat()
+        fresh_date = (now - timedelta(days=1)).isoformat()
+        fresh_issue = {**self.BASE_ISSUE, "updated_at": fresh_date}
+        stale_issue = {**self.BASE_ISSUE, "updated_at": old_date}
+        score_fresh = scoring_service.score_live_issue(self.BASE_USER_SKILLS, fresh_issue, self.BASE_REPO)
+        score_stale = scoring_service.score_live_issue(self.BASE_USER_SKILLS, stale_issue, self.BASE_REPO)
+        assert score_fresh > score_stale
+
+    def test_empty_skill_json_returns_low_score(self):
+        score = scoring_service.score_live_issue({}, self.BASE_ISSUE, self.BASE_REPO)
+        assert score < 0.30
+
+    def test_score_is_clamped_between_zero_and_one(self):
+        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
+        assert 0.0 <= score <= 1.0
+
+    def test_missing_updated_at_does_not_crash(self):
+        issue_no_date = {**self.BASE_ISSUE, "updated_at": None, "created_at": None}
+        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_no_date, self.BASE_REPO)
+        assert 0.0 <= score <= 1.0

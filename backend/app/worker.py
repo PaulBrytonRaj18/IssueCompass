@@ -10,6 +10,9 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.cache import close_redis, init_redis
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
@@ -235,6 +238,88 @@ async def check_saved_searches(ctx):
         return {"searches_checked": checked}
 
 
+async def index_issues_task(ctx: dict) -> None:
+    """
+    Background task: index open GitHub issues into the local DB.
+
+    Prioritises languages based on actual user skill_json data so we index
+    what our users actually care about. Falls back to a hardcoded base list
+    if the DB query returns nothing (cold start).
+    """
+    BASE_LANGUAGES = [
+        "python", "javascript", "typescript", "go", "rust",
+        "java", "c++", "ruby", "php", "swift",
+    ]
+    LABELS = ["good first issue", "help wanted"]
+
+    db: AsyncSession = ctx["db"]
+
+    # ── Determine languages to crawl ─────────────────────────────────────────
+    try:
+        result = await db.execute(
+            text(
+                """
+                SELECT lang, COUNT(*) AS user_count
+                FROM (
+                    SELECT jsonb_object_keys(skill_json->'languages') AS lang
+                    FROM users
+                    WHERE skill_json IS NOT NULL
+                      AND skill_json != 'null'::jsonb
+                ) sub
+                GROUP BY lang
+                ORDER BY user_count DESC
+                LIMIT 12
+                """
+            )
+        )
+        user_languages = [row[0].lower() for row in result.fetchall()]
+    except Exception as exc:
+        logger.warning("Could not query user languages, using base list: %s", exc)
+        user_languages = []
+
+    # Merge user languages with base list, user languages take priority
+    combined = list(dict.fromkeys(user_languages + BASE_LANGUAGES))
+    languages_to_index = combined[:12]
+
+    logger.info("Indexing %d languages: %s", len(languages_to_index), languages_to_index)
+
+    # ── Index each (language, label) pair ────────────────────────────────────
+    for lang in languages_to_index:
+        for label in LABELS:
+            try:
+                await index_language_issues(ctx, lang, label)
+            except Exception as exc:
+                logger.error("Failed to index lang=%s label=%s: %s", lang, label, exc)
+            await asyncio.sleep(0.5)
+
+
+async def cleanup_stale_issues_task(ctx: dict) -> None:
+    """
+    Daily maintenance task.
+    Removes issues from the local DB that are either:
+      - closed (state != 'open'), or
+      - not updated in the last 30 days.
+    """
+    db: AsyncSession = ctx["db"]
+    try:
+        result = await db.execute(
+            text(
+                """
+                DELETE FROM issues
+                WHERE state != 'open'
+                   OR updated_at < NOW() - INTERVAL '30 days'
+                RETURNING id
+                """
+            )
+        )
+        deleted_count = len(result.fetchall())
+        await db.commit()
+        logger.info("Stale issue cleanup: removed %d issues", deleted_count)
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Stale issue cleanup failed: %s", exc)
+
+
 def _parse_redis_url(url: str) -> dict:
     """Parse a Redis URL into ARQ-compatible redis_settings dict.
 
@@ -262,13 +347,14 @@ def _parse_redis_url(url: str) -> dict:
 
 class WorkerSettings:
     redis_settings = _parse_redis_url(settings.REDIS_URL)
-    functions = [full_index, index_language_issues, check_saved_searches]
+    functions = [full_index, index_language_issues, check_saved_searches, index_issues_task, cleanup_stale_issues_task]
     on_startup = startup
     on_shutdown = shutdown
     keep_result = 3600
     keep_result_failed = 86400
     max_tries = 3
     job_timeout = 300
+    cron_jobs = []
 
 
 if __name__ == "__main__":

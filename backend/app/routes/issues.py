@@ -32,83 +32,102 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 async def get_matched_issues(
     request: Request,
     current_user: User = Depends(get_current_user),
-    language: Optional[str] = Query(None),
-    label: Optional[str] = Query(None),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    is_good_first_issue: Optional[bool] = Query(None, description="Filter by good first issue"),
+    is_help_wanted: Optional[bool] = Query(None, description="Filter by help wanted"),
+    difficulty: Optional[str] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get personalized issue matches for the current user. Cached 5 minutes."""
-    user = current_user
-
-    cache_key = f"matches:{user.id}:{language or ''}:{label or ''}:{limit}:{offset}"
-    cached = await cache_get(cache_key)
-    if cached:
-        return IssueMatchResponse(**cached)
+    """Get personalized issue matches for the current user. Combines DB + live GitHub results."""
+    filters = {
+        "language": language,
+        "is_good_first_issue": is_good_first_issue,
+        "is_help_wanted": is_help_wanted,
+        "difficulty": difficulty,
+    }
+    filters = {k: v for k, v in filters.items() if v is not None}
 
     matches_raw = await matching_service.get_matched_issues(
         db=db,
-        user=user,
+        user=current_user,
         limit=limit,
         offset=offset,
-        language_filter=language,
-        label_filter=label,
+        filters=filters,
+        github_service_instance=github_service,
+        cache=True,
     )
 
     matches = []
     for m in matches_raw:
         issue = m["issue"]
         repo = m["repository"]
-        matches.append(
-            MatchedIssue(
-                issue=IssuePublic(
-                    id=issue.id,
-                    github_id=issue.github_id,
-                    number=issue.number,
-                    title=issue.title,
-                    body=issue.body,
-                    html_url=issue.html_url,
-                    state=issue.state,
-                    labels=issue.labels,
-                    is_good_first_issue=issue.is_good_first_issue,
-                    is_help_wanted=issue.is_help_wanted,
-                    required_skills=issue.required_skills,
-                    complexity_score=issue.complexity_score,
-                    comments=issue.comments,
-                    created_at=issue.created_at,
-                    repository=RepositoryPublic(
-                        id=repo.id,
-                        full_name=repo.full_name,
-                        name=repo.name,
-                        description=repo.description,
-                        owner_login=repo.owner_login,
-                        html_url=repo.html_url,
-                        stars=repo.stars,
-                        primary_language=repo.primary_language,
-                        topics=repo.topics,
-                    ),
+        if isinstance(issue, dict):
+            issue_pub = IssuePublic(
+                id=issue.get("id", 0),
+                github_id=issue.get("github_id", 0),
+                number=issue.get("number", 0),
+                title=issue.get("title", ""),
+                body=issue.get("body"),
+                html_url=issue.get("html_url", ""),
+                state=issue.get("state", "open"),
+                labels=issue.get("labels"),
+                is_good_first_issue=issue.get("is_good_first_issue", False),
+                is_help_wanted=issue.get("is_help_wanted", False),
+                required_skills=issue.get("required_skills"),
+                complexity_score=issue.get("complexity_score", 0.5),
+                comments=issue.get("comments", 0),
+                created_at=issue.get("created_at"),
+                repository=RepositoryPublic(
+                    id=repo.get("id", 0) if isinstance(repo, dict) else repo.id,
+                    full_name=repo.get("full_name") if isinstance(repo, dict) else repo.full_name,
+                    name=repo.get("name") if isinstance(repo, dict) else repo.name,
+                    description=repo.get("description") if isinstance(repo, dict) else repo.description,
+                    owner_login=repo.get("owner_login") if isinstance(repo, dict) else repo.owner_login,
+                    html_url=repo.get("html_url") if isinstance(repo, dict) else repo.html_url,
+                    stars=repo.get("stars", 0) if isinstance(repo, dict) else repo.stars,
+                    primary_language=repo.get("primary_language") if isinstance(repo, dict) else repo.primary_language,
+                    topics=repo.get("topics") if isinstance(repo, dict) else repo.topics,
                 ),
-                match_score=m["match_score"],
-                matching_skills=m["matching_skills"],
-                why_matched=m["why_matched"],
             )
+        else:
+            issue_pub = IssuePublic.model_validate(issue)
+            issue_pub.repository = (
+                RepositoryPublic.model_validate(repo)
+                if hasattr(repo, "id")
+                else RepositoryPublic(
+                    full_name=repo.get("full_name", ""),
+                    name=repo.get("name", ""),
+                    owner_login=repo.get("owner_login", ""),
+                    html_url=repo.get("html_url", ""),
+                )
+            )
+
+        match_item = MatchedIssue(
+            issue=issue_pub,
+            match_score=m["match_score"],
+            matching_skills=m["matching_skills"],
+            why_matched=m["why_matched"],
         )
+        if m.get("is_live_result"):
+            match_item.is_live_result = True
+            match_item.live_fetched_at = m.get("live_fetched_at")
+        matches.append(match_item)
 
     from app.schemas.schemas import SkillFingerprint
     user_skills = None
-    if user.skill_json:
+    if current_user.skill_json:
         try:
-            user_skills = SkillFingerprint(**user.skill_json)
+            user_skills = SkillFingerprint(**current_user.skill_json)
         except Exception:
             pass
 
-    response = IssueMatchResponse(
+    return IssueMatchResponse(
         matches=matches,
         total=len(matches),
         user_skills=user_skills,
     )
-    await cache_set(cache_key, response.model_dump(), ttl=300)
-    return response
 
 
 @router.post("/index")
