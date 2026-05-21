@@ -33,6 +33,17 @@ if "+asyncpg" not in DATABASE_URL:
 # Without this, PgBouncer transaction pooling causes:
 #   InvalidSQLStatementNameError — prepared stmt does not exist on backend
 #   DuplicatePreparedStatementError — same stmt name reused across backends
+# Log connection target with credentials masked
+def _mask_db_url(raw: str) -> str:
+    if "@" in raw:
+        return raw.split("@")[0].split("://")[0] + "://****@" + raw.split("@", 1)[1]
+    return raw
+logger.info(
+    "DB_ENGINE: creating async engine — target=%s pool=3/2 recycle=300s "
+    "stmt_cache=0 prep_stmt_cache=0 pre_ping=True LIFO=True",
+    _mask_db_url(settings.DATABASE_URL),
+)
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
@@ -121,10 +132,13 @@ async def init_db():
     avoids the risk of a ``CREATE EXTENSION`` prepared statement lingering
     across PgBouncer backend switches.
     """
+    from sqlalchemy.pool import NullPool
+
     try:
+        logger.info("DB_INIT: creating short-lived engine (NullPool, cache disabled)")
         tmp_engine = create_async_engine(
             DATABASE_URL,
-            poolclass=None,  # noqa: use default NullPool behaviour for short-lived engine
+            poolclass=NullPool,
             connect_args={
                 "timeout": 10,
                 "statement_cache_size": 0,
@@ -135,6 +149,6 @@ async def init_db():
         async with tmp_engine.begin() as conn:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await tmp_engine.dispose()
-        logger.info("Database extension verified")
+        logger.info("DB_INIT: database extension verified")
     except Exception as e:
-        logger.warning("Could not create vector extension (managed PG?): %s", e)
+        logger.warning("DB_INIT: could not create vector extension (managed PG?): %s", e)

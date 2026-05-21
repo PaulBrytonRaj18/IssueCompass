@@ -34,12 +34,17 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("CONFIG: all checks passed")
 
-    await init_db()
+    try:
+        logger.info("DB: initializing connection pool and extensions...")
+        await init_db()
+        logger.info("DB: engine pool ready")
+    except Exception as e:
+        logger.error("DB: init failed — %s: %s", type(e).__name__, e)
 
     try:
         await init_redis()
     except Exception as e:
-        logger.warning("Redis init failed: %s", e)
+        logger.warning("Redis: init failed — %s", e)
 
     logger.info("IssueCompass API ready")
     yield
