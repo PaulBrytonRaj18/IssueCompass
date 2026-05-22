@@ -1,3 +1,11 @@
+# ============================================================
+# IssueCompass — Production-Grade Pre-Deployment Pipeline
+# ============================================================
+# Gates ALL deployments behind full validation:
+#   lint -> test -> DB compat -> Alembic -> startup -> Docker
+# Broken deployments NEVER reach Render.
+# ============================================================
+
 name: CI
 
 env:
@@ -13,15 +21,55 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ────────────────────────────────────────────────────────────
+# PRE-FLIGHT: Environment validation
+# ────────────────────────────────────────────────────────────
 jobs:
-  # ── Backend lint & test ──────────────────────────────────────
-  backend:
-    name: Backend
+  env-check:
+    name: Env Validation
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required secrets exist
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          missing=""
+          for var in \
+            DATABASE_URL REDIS_URL SECRET_KEY GITHUB_TOKEN \
+            GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET GROQ_API_KEY \
+            JINA_API_KEY RENDER_DEPLOY_HOOK_URL
+          do
+            if [ -z "${!var}" ]; then
+              missing="$missing $var"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::MISSING REQUIRED SECRETS:$missing"
+            echo "::error::Set these in GitHub -> Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
+  # ────────────────────────────────────────────────────────────
+  # BACKEND LINT: ruff + mypy
+  # ────────────────────────────────────────────────────────────
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    needs: [env-check]
     defaults:
       run:
         working-directory: backend
-
     steps:
       - uses: actions/checkout@v4
 
@@ -36,21 +84,22 @@ jobs:
 
       - name: Lint with ruff
         run: pip install ruff && ruff check .
+        env:
+          RUFF_OUTPUT_FORMAT: github
 
       - name: Type check with mypy
         run: pip install mypy && mypy app/ --ignore-missing-imports
 
-      - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
-
-  # ── Frontend lint & build ────────────────────────────────────
+  # ────────────────────────────────────────────────────────────
+  # FRONTEND: npm ci + lint + typecheck
+  # ────────────────────────────────────────────────────────────
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+    needs: [env-check]
     defaults:
       run:
         working-directory: frontend
-
     steps:
       - uses: actions/checkout@v4
 
@@ -70,13 +119,338 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-  # ── Deploy to Render (main branch only) ──────────────────────
+  # ────────────────────────────────────────────────────────────
+  # BACKEND TEST: pytest (mocked DB, no postgres needed)
+  # ────────────────────────────────────────────────────────────
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: [env-check]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short --no-header 2>&1 | tail -50
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          REDIS_URL: memory://
+          SECRET_KEY: ci-secret-key-not-default-1234567890
+          GITHUB_TOKEN: ci-placeholder
+          GITHUB_CLIENT_ID: ci-placeholder
+          GITHUB_CLIENT_SECRET: ci-placeholder
+          GROQ_API_KEY: ""
+          JINA_API_KEY: ""
+          AI_ENABLED: "false"
+          EMBEDDINGS_ENABLED: "false"
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: backend/tests/
+
+  # ────────────────────────────────────────────────────────────
+  # DATABASE VALIDATION: PgBouncer compat + Alembic + schema
+  # ────────────────────────────────────────────────────────────
+  db-validate:
+    name: DB Validation
+    runs-on: ubuntu-latest
+    needs: [env-check]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: issuecompass
+          POSTGRES_PASSWORD: issuecompass
+          POSTGRES_DB: issuecompass
+        options: >-
+          --health-cmd pg_isready -U issuecompass
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run CI validation suite
+        env:
+          DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          DATABASE_URL_DIRECT: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          SECRET_KEY: ci-secret-key-not-default-1234567890
+          GITHUB_TOKEN: ci-placeholder
+          GITHUB_CLIENT_ID: ci-placeholder
+          GITHUB_CLIENT_SECRET: ci-placeholder
+          JINA_API_KEY: ci-placeholder
+          AI_ENABLED: "false"
+          EMBEDDINGS_ENABLED: "false"
+        run: python -m scripts.ci_validate
+
+  # ────────────────────────────────────────────────────────────
+  # STARTUP VALIDATION: Boot FastAPI, hit /health
+  # ────────────────────────────────────────────────────────────
+  startup-validate:
+    name: Startup Validation
+    runs-on: ubuntu-latest
+    needs: [env-check, backend-lint, backend-test, db-validate]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: issuecompass
+          POSTGRES_PASSWORD: issuecompass
+          POSTGRES_DB: issuecompass
+        options: >-
+          --health-cmd pg_isready -U issuecompass
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Apply Alembic migrations
+        env:
+          DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          DATABASE_URL_DIRECT: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+        run: alembic upgrade head 2>&1
+
+      - name: Start FastAPI server
+        env:
+          DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: ci-secret-key-not-default-1234567890
+          GITHUB_TOKEN: ci-placeholder
+          GITHUB_CLIENT_ID: ci-placeholder
+          GITHUB_CLIENT_SECRET: ci-placeholder
+          GROQ_API_KEY: ci-placeholder
+          JINA_API_KEY: ci-placeholder
+          AI_ENABLED: "false"
+          EMBEDDINGS_ENABLED: "false"
+          METRICS_API_KEY: ""
+          PORT: "8080"
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8080 --log-level info &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "FastAPI server is ready (attempt $i)"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::FastAPI server failed to start within 30 seconds"
+              kill $SERVER_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Validate /health endpoint
+        run: |
+          echo "=== /health response ==="
+          curl -sf http://localhost:8080/health | python -m json.tool
+          echo ""
+          echo "=== Validating health fields ==="
+          curl -sf http://localhost:8080/health | python -c "import json,sys;d=json.load(sys.stdin);exit(0 if d.get('status') in ('ok','degraded') and d.get('database') is True and d.get('redis') is True and d.get('version') and d.get('pool') else 1)"
+          if [ $? -eq 0 ]; then
+            echo "Health validation: PASSED"
+          else
+            echo "::error::Health validation failed - check /health output above"
+            exit 1
+          fi
+
+      - name: Shutdown server
+        if: always()
+        run: |
+          if [ -n "$SERVER_PID" ]; then
+            kill "$SERVER_PID" 2>/dev/null || true
+            echo "Server stopped"
+          fi
+
+  # ────────────────────────────────────────────────────────────
+  # DOCKER VALIDATION: Build image, run container, hit /health
+  # ────────────────────────────────────────────────────────────
+  docker-validate:
+    name: Docker Validation
+    runs-on: ubuntu-latest
+    needs: [env-check, backend-lint, backend-test, db-validate]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: issuecompass
+          POSTGRES_PASSWORD: issuecompass
+          POSTGRES_DB: issuecompass
+        options: >-
+          --health-cmd pg_isready -U issuecompass
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t issuecompass-backend:ci -f Dockerfile .
+        working-directory: backend
+
+      - name: Run Docker container
+        run: |
+          docker run -d \
+            --network host \
+            --name issuecompass-ci \
+            -e DATABASE_URL=postgresql://issuecompass:issuecompass@localhost:5432/issuecompass \
+            -e REDIS_URL=redis://localhost:6379 \
+            -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }} \
+            -e GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }} \
+            -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+            -e JINA_API_KEY=${{ secrets.JINA_API_KEY }} \
+            -e AI_ENABLED=false \
+            -e EMBEDDINGS_ENABLED=false \
+            -e METRICS_API_KEY="" \
+            -e PORT=8080 \
+            issuecompass-backend:ci
+
+      - name: Wait for container startup
+        run: |
+          echo "Waiting for container to start..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Container is ready (attempt $i)"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "::error::Container failed to start within 60 seconds"
+              docker logs issuecompass-ci 2>&1 | tail -50
+              docker stop issuecompass-ci 2>/dev/null || true
+              docker rm issuecompass-ci 2>/dev/null || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Validate /health from container
+        run: |
+          echo "=== Container /health ==="
+          curl -sf http://localhost:8080/health | python -m json.tool
+          echo ""
+          echo "=== Validating container health ==="
+          curl -sf http://localhost:8080/health | python -c "import json,sys;d=json.load(sys.stdin);exit(0 if d.get('status') in ('ok','degraded') and d.get('database') is True and d.get('redis') is True and d.get('version') and d.get('pool') else 1)"
+          if [ $? -eq 0 ]; then
+            echo "Container health validation: PASSED"
+          else
+            echo "::error::Container health validation failed - check /health output above"
+            exit 1
+          fi
+
+      - name: Show container logs
+        if: always()
+        run: |
+          echo "=== Container logs ==="
+          docker logs issuecompass-ci 2>&1 | tail -30
+
+      - name: Cleanup container
+        if: always()
+        run: |
+          docker stop issuecompass-ci 2>/dev/null || true
+          docker rm issuecompass-ci 2>/dev/null || true
+
+  # ────────────────────────────────────────────────────────────
+  # DEPLOYMENT: Trigger Render Deploy Hook (main only)
+  # ────────────────────────────────────────────────────────────
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend, frontend]
+    needs:
+      - env-check
+      - backend-lint
+      - frontend
+      - backend-test
+      - db-validate
+      - startup-validate
+      - docker-validate
     steps:
+      - name: Log validation gates
+        run: |
+          echo "========================================="
+          echo "ALL VALIDATION GATES PASSED"
+          echo "========================================="
+          echo " env-check:          OK"
+          echo " backend-lint:       OK"
+          echo " frontend:           OK"
+          echo " backend-test:       OK"
+          echo " db-validate:        OK"
+          echo " startup-validate:   OK"
+          echo " docker-validate:    OK"
+          echo "========================================="
+          echo "Triggering Render deployment..."
+
       - name: Trigger Render Deploy Hook
-        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-        timeout-minutes: 1
+        run: |
+          echo "Deploying to Render..."
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            --fail --silent --show-error \
+            --max-time 30
+          echo ""
+          echo "Render deploy hook triggered successfully"

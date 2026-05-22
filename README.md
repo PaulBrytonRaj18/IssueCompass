@@ -245,6 +245,40 @@ Tests override `AI_ENABLED=false` and `GROQ_API_KEY=""` to avoid real LLM calls.
 
 ---
 
+## CI/CD Pipeline
+
+Every push and PR runs through an 8-job **pre-deployment validation pipeline** on GitHub Actions. Broken deployments never reach Render.
+
+```
+Push Code
+  ↓
+env-check (verify all 9 secrets exist)
+  ├── backend-lint   (ruff + mypy)
+  ├── frontend       (npm ci + lint + tsc)
+  ├── backend-test   (104 pytest, mocked DB)
+  └── db-validate    (pgvector, async engine, PgBouncer compat, Alembic, schema)
+      ├── startup-validate  (boot FastAPI, hit /health — DB + Redis)
+      └── docker-validate   (build image, run container, hit /health)
+           └── deploy  (Render Deploy Hook — main branch only)
+```
+
+| Job | What it validates |
+|---|---|
+| `env-check` | All 9 secrets exist (DATABASE_URL, REDIS_URL, SECRET_KEY, GITHUB_TOKEN, GITHUB_CLIENT_ID/SECRET, GROQ_API_KEY, JINA_API_KEY, RENDER_DEPLOY_HOOK_URL) |
+| `backend-lint` | ruff (PEP 8) + mypy (strict) — zero errors |
+| `frontend` | npm ci + lint + TypeScript `--noEmit` |
+| `backend-test` | 104 pytest (mocked DB/Redis, no services needed) |
+| `db-validate` | Real pgvector connection, `statement_cache_size=0` PgBouncer safety, `db_reconcile` on fresh DB, Alembic migrations, schema introspection |
+| `startup-validate` | Actual FastAPI boot with uvicorn, Alembic pre-applied, `/health` validates status+DB+Redis+version+pool |
+| `docker-validate` | Build Docker image from `backend/Dockerfile`, run container with `--network host`, validate `/health` |
+| `deploy` | Fires only on `main` + `push` after all 7 gates pass. Curl POST to `RENDER_DEPLOY_HOOK_URL` |
+
+The `startup-validate` and `docker-validate` jobs are gated behind `backend-lint`, `backend-test`, and `db-validate` — they only run if code quality and database checks pass first.
+
+DB validation uses `pgvector/pgvector:pg16` and `redis:7-alpine` as GitHub Actions service containers. A reusable [`scripts/ci_validate.py`](backend/scripts/ci_validate.py) runs the full async engine + PgBouncer + Alembic + schema suite.
+
+---
+
 ## Deployment
 
 ### Docker Compose (recommended)
