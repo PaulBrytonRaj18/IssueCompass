@@ -13,9 +13,17 @@ trap cleanup TERM INT
 
 export PORT=${PORT:-8080}
 
+# Validate PORT is numeric to prevent sed injection in nginx config
+case "$PORT" in
+    ''|*[!0-9]*) echo "FATAL: PORT must be numeric, got '$PORT'"; exit 1 ;;
+esac
 sed -i "s/\${PORT}/$PORT/g" /etc/nginx/nginx.conf
 
 cd /app/backend
+echo "Running database reconciliation..."
+python -m scripts.db_reconcile 2>&1
+echo "Running database migrations..."
+alembic upgrade head 2>&1
 gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:8000 \

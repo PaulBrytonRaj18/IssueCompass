@@ -26,6 +26,12 @@ class AuthStateResponse(BaseModel):
 
 
 def _extract_token(request: Request) -> Optional[str]:
+    """Extract JWT from Authorization header (preferred) or cookie fallback.
+    
+    The frontend sends Bearer tokens via `Authorization` header for API calls
+    and also receives the `ic_token` cookie for server-side middleware checks.
+    The header takes precedence when both are present.
+    """
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:]
@@ -39,8 +45,8 @@ def _set_token_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=max_age,
         httponly=True,
-        samesite="none" if settings.COOKIE_SECURE else "lax",
-        secure=True,
+        samesite="lax",
+        secure=settings.COOKIE_SECURE,
         path="/",
     )
 

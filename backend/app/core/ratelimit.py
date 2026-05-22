@@ -26,6 +26,13 @@ def _resolve_storage_uri() -> str:
     does not gracefully handle Redis connection errors at runtime,
     and switching to `memory://` eliminates that class of outage.
 
+    NOTE: In-memory rate limiting is PER-WORKER-PROCESS. With 2+ gunicorn
+    workers, each worker maintains its own counter, so a user can exhaust
+    their limit on worker A and get a fresh 60 requests on worker B.
+    This is an accepted trade-off for stability over strict enforcement.
+    For strict rate enforcement, use local Redis (docker-compose) which
+    falls through to the Redis-backed storage path below.
+
     The Redis-backed cache in `app.core.cache` still handles caching
     independently and degrades gracefully on its own.
     """

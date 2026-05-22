@@ -11,7 +11,7 @@ pydantic-settings==2.2.1
 pyjwt==2.8.0
 python-dotenv==1.0.1
 numpy==1.26.4
-scikit-learn==1.4.2
+
 slowapi==0.1.9
 redis[hiredis]==4.6.0
 tenacity==8.5.0

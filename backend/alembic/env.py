@@ -66,8 +66,8 @@ async def run_async_migrations():
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
         connect_args={
-            "prepared_statement_cache_size": 0,
             "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
             "timeout": 10,
             "command_timeout": 60,
         },

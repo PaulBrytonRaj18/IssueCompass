@@ -1,6 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, or_, select
@@ -370,6 +371,30 @@ async def _intent_to_vector(intent: SearchIntent) -> List[float]:
     return await skill_service.issue_text_to_vector(title, body, labels)
 
 
+def _ensure_orm_compat(obj: Any, defaults: dict | None = None) -> Any:
+    """
+    Ensure an object supports attribute access for the scoring pipeline.
+
+    When ``obj`` is a dict (e.g. a live-issue match), convert it to a
+    lightweight object with attribute access so it can be consumed by
+    ``scoring_service`` functions that expect ORM instances.  ORM instances
+    are returned unchanged.
+    """
+    if not isinstance(obj, dict):
+        return obj
+
+    fields = dict(defaults or {})
+    for k, v in obj.items():
+        if k in ("created_at", "updated_at") and isinstance(v, str):
+            try:
+                v = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                v = None
+        fields[k] = v
+
+    return type("_CompatObj", (), fields)()
+
+
 def re_rank_results(
     results: List[Dict[str, Any]],
     user: User,
@@ -378,8 +403,11 @@ def re_rank_results(
     user_vector = user.skill_vector
 
     for r in results:
-        issue = r["issue"]
-        repo = r["repository"]
+        issue = _ensure_orm_compat(r["issue"], {"skill_vector": None})
+        repo = _ensure_orm_compat(
+            r["repository"],
+            {"is_archived": False, "last_indexed": None, "forks": 0},
+        )
 
         if user_vector is not None and issue.skill_vector is not None:
             skill_sim = matching_service.cosine_similarity(user_vector, issue.skill_vector)

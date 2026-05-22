@@ -14,6 +14,7 @@ PgBouncer Transaction Pooling Notes:
 
 import logging
 
+import asyncpg
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -38,10 +39,13 @@ def _mask_db_url(raw: str) -> str:
     if "@" in raw:
         return raw.split("@")[0].split("://")[0] + "://****@" + raw.split("@", 1)[1]
     return raw
+asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
-    "DB_ENGINE: creating async engine — target=%s pool=3/2 recycle=300s "
-    "stmt_cache=0 prep_stmt_cache=0 pre_ping=True LIFO=True",
+    "DB_ENGINE: creating async engine — target=%s asyncpg=%s "
+    "pool=3/2 recycle=300s stmt_cache=0 prep_stmt_cache=0 "
+    "pre_ping=True LIFO=True isolation=READ_COMMITTED",
     _mask_db_url(settings.DATABASE_URL),
+    asyncpg_version,
 )
 
 engine = create_async_engine(
@@ -106,8 +110,19 @@ async def close_db():
     PgBouncer can immediately reclaim the backend connections.
     """
     if engine is not None:
+        try:
+            pool = engine.pool
+            logger.info(
+                "DB_DISPOSE: closing pool — size=%d checked_in=%d checked_out=%d overflow=%d",
+                pool.size(),
+                pool.checkedin(),
+                pool.checkedout(),
+                pool.overflow(),
+            )
+        except Exception:
+            pass
         await engine.dispose()
-        logger.info("Engine pool disposed")
+        logger.info("DB_DISPOSE: engine pool disposed")
 
 
 async def get_pool_status() -> dict:
@@ -131,11 +146,23 @@ async def init_db():
     NOT pollute the application pool's prepared-statement state.  This
     avoids the risk of a ``CREATE EXTENSION`` prepared statement lingering
     across PgBouncer backend switches.
+
+    All connections from this function set statement_cache_size=0 and
+    prepared_statement_cache_size=0 so that asyncpg does NOT cache prepared
+    statements across PgBouncer backend connections.  Without this,
+    PgBouncer transaction pooling causes:
+      - InvalidSQLStatementNameError
+      - DuplicatePreparedStatementError
     """
     from sqlalchemy.pool import NullPool
 
     try:
-        logger.info("DB_INIT: creating short-lived engine (NullPool, cache disabled)")
+        asyncpg_version = getattr(asyncpg, "__version__", "unknown")
+        logger.info(
+            "DB_INIT: creating short-lived engine — asyncpg=%s "
+            "NullPool stmt_cache=0 prep_stmt_cache=0",
+            asyncpg_version,
+        )
         tmp_engine = create_async_engine(
             DATABASE_URL,
             poolclass=NullPool,
@@ -149,6 +176,9 @@ async def init_db():
         async with tmp_engine.begin() as conn:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await tmp_engine.dispose()
-        logger.info("DB_INIT: database extension verified")
+        logger.info(
+            "DB_INIT: database extension verified — "
+            "PgBouncer-safe config active (stmt_cache=0)",
+        )
     except Exception as e:
         logger.warning("DB_INIT: could not create vector extension (managed PG?): %s", e)

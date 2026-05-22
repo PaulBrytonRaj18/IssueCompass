@@ -24,7 +24,7 @@ from app.services.scoring_service import (
     score_live_issue,
     build_live_issue_explanation,
 )
-from app.services.skill_service import issue_text_to_vector
+from app.services.skill_service import _stable_hash, issue_text_to_vector
 
 logger = logging.getLogger("issuecompass.matching")
 
@@ -150,96 +150,101 @@ def _find_live_matching_skills(
 
 async def _persist_high_score_issues(
     live_matches: list[dict],
-    db: AsyncSession,
 ) -> None:
     """
     Background fire-and-forget task.
     For each live match above PERSIST_SCORE_THRESHOLD, upsert the issue into
     the PostgreSQL issues table and generate a skill_vector embedding.
+
+    Creates its own database session so it can safely run as a background
+    task without holding a reference to the request-scoped session.
     """
-    high_score = [
-        m for m in live_matches
-        if m.get("match_score", 0) >= PERSIST_SCORE_THRESHOLD
-        and m.get("_raw_github_id")
-    ]
+    from app.core.database import AsyncSessionLocal
 
-    if not high_score:
-        return
+    async with AsyncSessionLocal() as db:
+        high_score = [
+            m for m in live_matches
+            if m.get("match_score", 0) >= PERSIST_SCORE_THRESHOLD
+            and m.get("_raw_github_id")
+        ]
 
-    for match in high_score:
+        if not high_score:
+            return
+
+        for match in high_score:
+            try:
+                github_id = match["_raw_github_id"]
+
+                result = await db.execute(
+                    select(Issue).where(Issue.github_id == github_id)
+                )
+                existing = result.scalar_one_or_none()
+                if existing:
+                    existing.updated_at = match.get("updated_at")
+                    existing.comments = match.get("comments", existing.comments)
+                    continue
+
+                repo_result = await db.execute(
+                    select(Repository).where(
+                        Repository.full_name == match["repository"]["full_name"]
+                    )
+                )
+                repo_obj = repo_result.scalar_one_or_none()
+                if not repo_obj:
+                    repo_obj = Repository(
+                        github_id=_stable_hash(match["repository"]["full_name"], 2**31),
+                        full_name=match["repository"]["full_name"],
+                        name=match["repository"]["name"],
+                        owner_login=match["repository"]["owner_login"],
+                        html_url=match["repository"]["html_url"],
+                        stars=match["repository"]["stars"],
+                        primary_language=match["repository"]["primary_language"],
+                        topics=match["repository"]["topics"],
+                        is_archived=False,
+                    )
+                    db.add(repo_obj)
+                    await db.flush()
+
+                issue_text = match["issue"]["title"] + "\n" + (match["issue"].get("body") or "")
+                vector = await issue_text_to_vector(
+                    title=match["issue"]["title"],
+                    body=match["issue"].get("body") or "",
+                    labels=match["issue"].get("labels") or [],
+                )
+
+                new_issue = Issue(
+                    github_id=github_id,
+                    number=match["issue"]["number"],
+                    title=match["issue"]["title"],
+                    body=(match["issue"].get("body") or "")[:10000],
+                    html_url=match["issue"]["html_url"],
+                    state="open",
+                    labels=match["issue"]["labels"],
+                    is_good_first_issue=match["issue"]["is_good_first_issue"],
+                    is_help_wanted=match["issue"]["is_help_wanted"],
+                    comments=match["issue"]["comments"],
+                    skill_vector=vector,
+                    complexity_score=0.5,
+                    required_skills={},
+                    repository_id=repo_obj.id,
+                )
+                db.add(new_issue)
+
+            except Exception as exc:
+                logger.warning(
+                    "Failed to persist live issue github_id=%s: %s",
+                    match.get("_raw_github_id"),
+                    exc,
+                )
+
         try:
-            github_id = match["_raw_github_id"]
-
-            result = await db.execute(
-                select(Issue).where(Issue.github_id == github_id)
+            await db.commit()
+            logger.info(
+                "Persisted %d high-score live issues to DB", len(high_score)
             )
-            existing = result.scalar_one_or_none()
-            if existing:
-                existing.updated_at = match.get("updated_at")
-                existing.comments = match.get("comments", existing.comments)
-                continue
-
-            repo_result = await db.execute(
-                select(Repository).where(
-                    Repository.full_name == match["repository"]["full_name"]
-                )
-            )
-            repo_obj = repo_result.scalar_one_or_none()
-            if not repo_obj:
-                repo_obj = Repository(
-                    github_id=abs(hash(match["repository"]["full_name"])) % (2**31),
-                    full_name=match["repository"]["full_name"],
-                    name=match["repository"]["name"],
-                    owner_login=match["repository"]["owner_login"],
-                    html_url=match["repository"]["html_url"],
-                    stars=match["repository"]["stars"],
-                    primary_language=match["repository"]["primary_language"],
-                    topics=match["repository"]["topics"],
-                    is_archived=False,
-                )
-                db.add(repo_obj)
-                await db.flush()
-
-            issue_text = match["issue"]["title"] + "\n" + (match["issue"].get("body") or "")
-            vector = await issue_text_to_vector(
-                title=match["issue"]["title"],
-                body=match["issue"].get("body") or "",
-                labels=match["issue"].get("labels") or [],
-            )
-
-            new_issue = Issue(
-                github_id=github_id,
-                number=match["issue"]["number"],
-                title=match["issue"]["title"],
-                body=(match["issue"].get("body") or "")[:10000],
-                html_url=match["issue"]["html_url"],
-                state="open",
-                labels=match["issue"]["labels"],
-                is_good_first_issue=match["issue"]["is_good_first_issue"],
-                is_help_wanted=match["issue"]["is_help_wanted"],
-                comments=match["issue"]["comments"],
-                skill_vector=vector,
-                complexity_score=0.5,
-                required_skills={},
-                repository_id=repo_obj.id,
-            )
-            db.add(new_issue)
-
         except Exception as exc:
-            logger.warning(
-                "Failed to persist live issue github_id=%s: %s",
-                match.get("_raw_github_id"),
-                exc,
-            )
-
-    try:
-        await db.commit()
-        logger.info(
-            "Persisted %d high-score live issues to DB", len(high_score)
-        )
-    except Exception as exc:
-        await db.rollback()
-        logger.error("Commit failed during live issue persistence: %s", exc)
+            await db.rollback()
+            logger.error("Commit failed during live issue persistence: %s", exc)
 
 
 async def _get_db_matched_issues(
@@ -457,13 +462,17 @@ async def get_matched_issues(
 
     all_matches = db_results + unique_live
 
-    # ── Sort by match_score ─────────────────────────────────────────────────
-    all_matches.sort(key=lambda m: m.get("match_score", 0), reverse=True)
+    # ── Re-rank the unified list ─────────────────────────────────────────────
+    if user.skill_vector is not None:
+        from app.services.search_service import re_rank_results
+        all_matches = re_rank_results(all_matches, user)
+    else:
+        all_matches.sort(key=lambda m: m.get("match_score", 0), reverse=True)
 
     # ── Fire-and-forget persistence for high-score live issues ───────────────
     if unique_live:
         asyncio.create_task(
-            _persist_high_score_issues(unique_live, db)
+            _persist_high_score_issues(unique_live)
         )
 
     # ── Cache the full ranked list ───────────────────────────────────────────

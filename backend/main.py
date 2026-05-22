@@ -1,6 +1,8 @@
 import logging
 from contextlib import asynccontextmanager
 
+import asyncpg
+
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
 from app.core.database import close_db, get_pool_status, init_db
@@ -25,6 +27,13 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("IssueCompass API starting up...")
+
+    asyncpg_version = getattr(asyncpg, "__version__", "unknown")
+    logger.info(
+        "DB: PgBouncer-safe config — asyncpg=%s "
+        "stmt_cache=0 prep_stmt_cache=0 pool_pre_ping=True pool_recycle=300s",
+        asyncpg_version,
+    )
 
     config_errors = settings.check_errors()
     if config_errors:

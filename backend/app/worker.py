@@ -18,6 +18,8 @@ from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.database import engine as db_engine
 from app.core.utils import parse_dt
+from arq import cron
+
 from app.services import github_service, skill_service
 
 logger = logging.getLogger("issuecompass.worker")
@@ -354,7 +356,10 @@ class WorkerSettings:
     keep_result_failed = 86400
     max_tries = 3
     job_timeout = 300
-    cron_jobs = []
+    cron_jobs = [
+        cron(index_issues_task, hour={0, 6, 12, 18}, minute=0),
+        cron(cleanup_stale_issues_task, hour=3, minute=30),
+    ]
 
 
 if __name__ == "__main__":

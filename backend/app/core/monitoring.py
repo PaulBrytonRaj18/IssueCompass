@@ -45,6 +45,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         duration = time.monotonic() - start
         _request_durations.append(duration)
 
+        response.headers["X-Request-ID"] = request_id
         logger.info(
             "[%s] %s %s %d %.3fs",
             request_id,

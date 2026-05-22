@@ -1,0 +1,81 @@
+# ============================================================
+# IssueCompass — Render Blueprint (Infrastructure as Code)
+# ============================================================
+# Deploy via: https://render.com/docs/blueprint-spec
+#
+# Prerequisites:
+#   1. Create a Supabase Postgres instance
+#   2. Create an Upstash Redis instance
+#   3. Set secrets in Render Dashboard → Environment:
+#      DATABASE_URL, REDIS_URL, SECRET_KEY, GITHUB_CLIENT_ID,
+#      GITHUB_CLIENT_SECRET, GITHUB_TOKEN, GROQ_API_KEY,
+#      JINA_API_KEY, NEXTAUTH_SECRET, METRICS_API_KEY
+# ============================================================
+
+services:
+  # ─── FastAPI Backend ─────────────────────────────────────────
+  - type: web
+    name: issuecompass-backend
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m scripts.db_reconcile 2>&1 && alembic upgrade head 2>&1 && exec gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --max-requests 1000 --max-requests-jitter 50 --timeout 120 --keep-alive 5 --log-level info --access-logfile - --error-logfile -
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12
+      - key: AI_ENABLED
+        value: "true"
+      - key: EMBEDDINGS_ENABLED
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+      - key: METRICS_API_KEY
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+
+  # ─── Next.js Frontend ───────────────────────────────────────
+  - type: web
+    name: issuecompass-frontend
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: issuecompass-backend
+          property: url
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false

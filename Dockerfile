@@ -5,6 +5,9 @@ COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
 ARG NEXT_PUBLIC_API_URL
+# Default "" means the browser resolves /api/v1/* relative to the current
+# host, which nginx (in this container) proxies to the FastAPI backend.
+# For docker-compose or separate deployments, set this to the backend URL.
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-""}
 RUN npm run build
 
@@ -34,8 +37,7 @@ COPY backend/ ./backend/
 COPY --from=frontend-builder /app/.next/standalone ./frontend/
 COPY --from=frontend-builder /app/.next/static ./frontend/.next/static
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY --chmod=755 start.sh /start.sh
 
 EXPOSE 8080
 

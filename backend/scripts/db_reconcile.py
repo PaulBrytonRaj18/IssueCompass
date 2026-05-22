@@ -12,6 +12,15 @@ Background:
   try to recreate them because it has no record of the current schema state.
   This causes "relation already exists" errors during deployment.
 
+PgBouncer Compatibility:
+  This script sets statement_cache_size=0 AND prepared_statement_cache_size=0
+  on every engine to prevent DuplicatePreparedStatementError when connecting
+  through PgBouncer transaction/statement pooling.
+
+  Retries are intentionally NOT used. Configuration errors (like missing
+  statement_cache_size=0) must fail immediately so deployment pipelines
+  catch the root cause, not mask it behind exponential backoff.
+
 Usage:
   python -m scripts.db_reconcile
 
@@ -42,88 +51,90 @@ async def reconcile() -> int:
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.pool import NullPool
 
-    # ── Retry loop ───────────────────────────────────────────────────────
-    # PgBouncer transaction pooling can cause transient prepared-statement
-    # conflicts when multiple deploy processes connect simultaneously.
-    # Retry with backoff to survive these race conditions.
-    import asyncio
-
-    max_retries = 3
-    last_error: Exception | None = None
-
-    for attempt in range(1, max_retries + 1):
-        engine = create_async_engine(
-            db_url,
-            poolclass=NullPool,
-            connect_args={
-                "prepared_statement_cache_size": 0,
-                "statement_cache_size": 0,
-                "timeout": 10,
-                "command_timeout": 30,
-            },
-        )
-        try:
-            print(f"DB_RECONCILE: Attempt {attempt}/{max_retries} — connecting...")
-            async with engine.connect() as conn:
-                result = await conn.execute(
-                    text(
-                        "SELECT EXISTS ("
-                        "  SELECT FROM information_schema.tables "
-                        "  WHERE table_name = 'alembic_version'"
-                        ")"
-                    )
+    # ── Single attempt — fail fast ────────────────────────────────────────
+    # Retries are intentionally absent. If this fails due to a configuration
+    # bug (e.g. PgBouncer + prepared statement cache), retrying will NOT fix
+    # it — it only hides the real issue and wastes deploy time.
+    engine = create_async_engine(
+        db_url,
+        poolclass=NullPool,
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "timeout": 10,
+            "command_timeout": 30,
+        },
+    )
+    print(
+        "DB_RECONCILE: engine created — target=%s stmt_cache=0 prep_stmt_cache=0 "
+        "fail_fast=True",
+        _mask_db_url(db_url),
+    )
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                text(
+                    "SELECT EXISTS ("
+                    "  SELECT FROM information_schema.tables "
+                    "  WHERE table_name = 'alembic_version'"
+                    ")"
                 )
-                alembic_version_exists = result.scalar()
-
-                if alembic_version_exists:
-                    print("DB_RECONCILE: alembic_version table found — no reconciliation needed")
-                    return 0
-
-                result = await conn.execute(
-                    text(
-                        "SELECT EXISTS ("
-                        "  SELECT FROM information_schema.tables "
-                        "  WHERE table_name = 'users'"
-                        ")"
-                    )
-                )
-                users_exists = result.scalar()
-
-                if not users_exists:
-                    print("DB_RECONCILE: Fresh database — no reconciliation needed")
-                    return 0
-
-                print(
-                    "DB_RECONCILE: Tables exist but alembic_version is missing — "
-                    "stamping head to prevent DuplicateTableError"
-                )
-                # Success — break out of retry loop
-                break
-
-        except Exception as e:
-            last_error = e
-            error_type = type(e).__name__
-            print(
-                f"DB_RECONCILE: Attempt {attempt}/{max_retries} failed "
-                f"[{error_type}]: {e}",
-                file=sys.stderr,
             )
-            if attempt < max_retries:
-                wait = attempt * 2  # linear backoff: 2s, 4s, ...
-                print(f"DB_RECONCILE: Retrying in {wait}s...")
-                await asyncio.sleep(wait)
-            else:
-                print(
-                    f"DB_RECONCILE: All {max_retries} attempts failed — "
-                    f"reconciliation will be retried on next deploy cycle",
-                    file=sys.stderr,
+            alembic_version_exists = result.scalar()
+
+            if alembic_version_exists:
+                print("DB_RECONCILE: alembic_version table found — no reconciliation needed")
+                return 0
+
+            result = await conn.execute(
+                text(
+                    "SELECT EXISTS ("
+                    "  SELECT FROM information_schema.tables "
+                    "  WHERE table_name = 'users'"
+                    ")"
                 )
-                return 1
-        finally:
-            try:
-                await engine.dispose()
-            except Exception:
-                pass  # engine may not have been fully created
+            )
+            users_exists = result.scalar()
+
+            if not users_exists:
+                print("DB_RECONCILE: Fresh database — no reconciliation needed")
+                return 0
+
+            print(
+                "DB_RECONCILE: Tables exist but alembic_version is missing — "
+                "stamping head to prevent DuplicateTableError"
+            )
+
+    except Exception as e:
+        error_type = type(e).__name__
+        print(
+            f"DB_RECONCILE: FAILED [{error_type}]: {e}",
+            file=sys.stderr,
+        )
+        print(
+            "DB_RECONCILE: This is likely a configuration error, not a transient "
+            "failure. Check that:",
+            file=sys.stderr,
+        )
+        print(
+            "  1. DATABASE_URL points to the correct database",
+            file=sys.stderr,
+        )
+        print(
+            "  2. PgBouncer is configured for transaction/statement pooling",
+            file=sys.stderr,
+        )
+        print(
+            "  3. statement_cache_size=0 and prepared_statement_cache_size=0 "
+            "are set in connect_args (both are required for PgBouncer)",
+            file=sys.stderr,
+        )
+        return 1
+    finally:
+        try:
+            await engine.dispose()
+        except Exception:
+            pass
 
     alembic_cfg_path = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
     import subprocess
@@ -139,6 +150,13 @@ async def reconcile() -> int:
 
     print("DB_RECONCILE: Successfully stamped alembic_version to head")
     return 0
+
+
+def _mask_db_url(raw: str) -> str:
+    """Mask credentials in a database URL for safe logging."""
+    if "@" in raw:
+        return raw.split("@")[0].split("://")[0] + "://****@" + raw.split("@", 1)[1]
+    return raw
 
 
 def main():

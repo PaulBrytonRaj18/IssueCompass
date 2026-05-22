@@ -28,15 +28,17 @@ _in_flight: Dict[str, "asyncio.Task[Any]"] = {}
 
 # Shared HTTPX client for connection reuse
 _shared_client: Optional[httpx.AsyncClient] = None
+_client_lock: asyncio.Lock = asyncio.Lock()
 
 # Concurrency limiter for AI API calls (prevent rate limit overwhelm)
 _ai_semaphore = asyncio.Semaphore(5)
 
 
-def _get_client() -> httpx.AsyncClient:
+async def _get_client() -> httpx.AsyncClient:
     global _shared_client
-    if _shared_client is None:
-        _shared_client = httpx.AsyncClient(timeout=30.0)
+    async with _client_lock:
+        if _shared_client is None:
+            _shared_client = httpx.AsyncClient(timeout=30.0)
     return _shared_client
 
 
@@ -159,7 +161,7 @@ async def _call_groq(
     }
 
     async with _ai_semaphore:
-        client = _get_client()
+        client = await _get_client()
         resp = await client.post(
             f"{_groq_base()}/chat/completions",
             headers=_groq_headers(),
@@ -258,7 +260,7 @@ async def _call_jina_embed(text: str) -> Optional[List[float]]:
     }
 
     async with _ai_semaphore:
-        client = _get_client()
+        client = await _get_client()
         resp = await client.post(
             f"{settings.JINA_API_BASE}/embeddings",
             headers={
