@@ -2,7 +2,7 @@
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Github, Zap, Target, BarChart3, ArrowRight, Star, GitFork } from "lucide-react";
+import { Github, ArrowRight, GitCommit, GitPullRequest, BookOpen, BarChart3, Hash } from "lucide-react";
 
 const DEMO_MATCHES = [
   {
@@ -33,20 +33,26 @@ const DEMO_MATCHES = [
 
 const FEATURES = [
   {
-    icon: <Zap size={20} />,
-    title: "Skill Fingerprint",
-    desc: "We analyze your real GitHub repos, commits, and languages — not what you claim to know.",
+    icon: <Hash size={16} />,
+    title: "Built from your Git history",
+    desc: "No self-assessments, no forms. We analyze your actual commits, repos, and languages to build a skill profile you can trust.",
   },
   {
-    icon: <Target size={20} />,
-    title: "Vector Matching",
-    desc: "pgvector semantic search finds issues where your exact skill set is the right fit.",
+    icon: <BarChart3 size={16} />,
+    title: "Semantic issue matching",
+    desc: "Vector search through thousands of open issues finds the ones where your specific skillset is most useful — not just keyword matches.",
   },
   {
-    icon: <BarChart3 size={20} />,
-    title: "Live Feed",
-    desc: "Your personalized issue feed updates daily. New matches every morning.",
+    icon: <GitPullRequest size={16} />,
+    title: "Daily personalized feed",
+    desc: "New issues indexed every 6 hours. Your feed updates automatically. No refresh needed, no noise.",
   },
+];
+
+const PRINCIPLES = [
+  { label: "No tracking", value: "Zero analytics. No cookies. No data sold." },
+  { label: "Open source", value: "MIT licensed. Fork it, host it, trust it." },
+  { label: "No AI hype", value: "We use ML where it helps (matching). Not where it doesn't (everything else)." },
 ];
 
 export default function LandingPage() {
@@ -64,141 +70,123 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen grid-bg relative overflow-hidden">
-      {/* Ambient glow */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[var(--accent)] opacity-[0.03] blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-blue-500 opacity-[0.03] blur-[100px]" />
-      </div>
-
+    <div className="min-h-screen dot-bg">
       {/* Navbar */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center">
-            <span className="text-black font-bold text-xs font-mono">OI</span>
+      <nav className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 flex items-center justify-center">
+            <span className="text-[var(--accent)] font-bold text-sm font-mono">IC</span>
           </div>
-          <span className="font-display font-bold text-lg text-[var(--foreground)]">
+          <span className="font-display font-bold text-base text-[var(--foreground)]">
             IssueCompass
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-[var(--accent-dim)] text-[var(--accent)] ml-1">
-            FOSS
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--muted)] ml-1">
+            MIT
           </span>
         </div>
         <div className="flex items-center gap-4">
           <a
-            href="https://github.com/Paul-Bryton-Raj/IssueCompass"
+            href="https://github.com/PaulBrytonRaj18/IssueCompass"
             target="_blank"
             className="flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
           >
             <Github size={15} />
-            <span className="hidden sm:inline">GitHub</span>
+            <span className="hidden sm:inline">Source</span>
           </a>
           <button
             onClick={handleSignIn}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--accent)] text-[var(--accent)] text-sm font-medium hover:bg-[var(--accent-dim)] transition-colors disabled:opacity-50"
           >
             <Github size={15} />
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Signing in..." : "Sign in with GitHub"}
           </button>
         </div>
       </nav>
 
       {/* Hero */}
-      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-20 pb-32">
-        {/* Badge */}
-        <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--border)] bg-[var(--surface)] text-sm text-[var(--muted)]">
-            <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-            Free & Open Source — MIT License
+      <main className="max-w-5xl mx-auto px-6 pt-24 pb-28">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border)] bg-[var(--surface)] mb-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            <span className="text-xs font-mono text-[var(--muted)]">Open source issue matching</span>
+          </div>
+
+          <h1 className="font-display text-5xl sm:text-6xl font-bold text-[var(--foreground)] leading-[1.05] tracking-tight mb-6 max-w-4xl mx-auto">
+            Find open source issues
+            <br />
+            <span className="text-[var(--accent)]">your skills actually match</span>
+          </h1>
+
+          <p className="text-base sm:text-lg text-[var(--muted)] max-w-2xl mx-auto leading-relaxed mb-10">
+            IssueCompass reads your GitHub activity — every repo, every commit, every language.
+            Then it matches you to open issues where your specific skills will make a real difference.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={handleSignIn}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:bg-[var(--accent)]/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Connecting..." : "Connect your GitHub"}
+              <ArrowRight size={15} />
+            </button>
+            <a
+              href="https://github.com/PaulBrytonRaj18/IssueCompass"
+              target="_blank"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
+            >
+              <Star size={15} />
+              Star on GitHub
+            </a>
           </div>
         </div>
 
-        {/* Headline */}
-        <div className="text-center mb-6">
-          <h1 className="font-display text-5xl sm:text-7xl font-bold text-[var(--foreground)] leading-[1.1] tracking-tight mb-6">
-            Stop searching.
-            <br />
-            <span className="text-[var(--accent)] text-glow">Start contributing.</span>
-          </h1>
-          <p className="text-lg sm:text-xl text-[var(--muted)] max-w-2xl mx-auto leading-relaxed">
-            IssueCompass analyzes your GitHub activity, builds your personal skill
-            fingerprint, and matches you to open-source issues you can{" "}
-            <em>actually</em> solve.
-          </p>
-        </div>
-
-        {/* CTA */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
-          <button
-            onClick={handleSignIn}
-            disabled={loading}
-            className="group flex items-center gap-3 px-8 py-4 rounded-xl bg-[var(--accent)] text-black font-semibold text-base hover:opacity-95 active:scale-98 transition-all glow-accent disabled:opacity-60"
-          >
-            <Github size={18} />
-            {loading ? "Connecting to GitHub..." : "Connect your GitHub — it's free"}
-            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-          <a
-            href="https://github.com/Paul-Bryton-Raj/IssueCompass"
-            className="flex items-center gap-2 px-6 py-4 rounded-xl border border-[var(--border)] text-[var(--foreground-dim)] text-sm hover:border-[var(--border-bright)] transition-colors"
-          >
-            <Star size={15} />
-            Star on GitHub
-          </a>
-        </div>
-
-        {/* Demo card */}
-        <div className="glass rounded-2xl overflow-hidden mb-20">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-2)]">
-            <div className="w-2.5 h-2.5 rounded-full bg-[var(--danger)]" />
-            <div className="w-2.5 h-2.5 rounded-full bg-[var(--warning)]" />
-            <div className="w-2.5 h-2.5 rounded-full bg-[var(--success)]" />
-            <span className="ml-2 text-xs font-mono text-[var(--muted)]">
-              matched issues for @yourusername
+        {/* Demo — terminal-inspired issue feed */}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] mb-24 overflow-hidden">
+          <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--danger)] opacity-60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--warning)] opacity-60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--success)] opacity-60" />
+            </div>
+            <span className="ml-3 text-xs font-mono text-[var(--muted)]">
+              ~/matches — matched issues for @you
             </span>
           </div>
-          <div className="p-4 space-y-3">
+          <div className="divide-y divide-[var(--border)]">
             {DEMO_MATCHES.map((m, i) => (
               <div
                 key={i}
-                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] carousel-card"
-                style={{ animationDelay: `${i * 3}s` }}
+                className="px-4 py-3.5 hover:bg-[var(--surface-2)] transition-colors"
+                style={{ animationDelay: `${i * 0.1}s` }}
               >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <p className="text-xs font-mono text-[var(--muted)] mb-1">
+                <div className="flex items-start justify-between gap-4 mb-1">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-mono text-[var(--muted)] mb-0.5">
                       {m.repo}
                     </p>
-                    <p className="text-sm font-medium text-[var(--foreground)]">
+                    <p className="text-sm font-medium text-[var(--foreground)] leading-snug">
                       {m.title}
                     </p>
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    <div className="text-xs font-mono text-[var(--accent)] font-bold">
+                    <div className="text-xs font-mono text-[var(--accent)] font-semibold tabular-nums">
                       {m.score}%
                     </div>
-                    <div className="text-[10px] text-[var(--muted)]">match</div>
+                    <div className="text-[10px] text-[var(--muted)] font-mono">match</div>
                   </div>
                 </div>
-                <div className="match-bar">
-                  <div
-                    className="match-bar-fill"
-                    style={{ width: `${m.score}%` }}
-                  />
+                <div className="match-bar max-w-[200px]">
+                  <div className="match-bar-fill" style={{ width: `${m.score}%` }} />
                 </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="skill-badge">{m.lang}</span>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="tag border-[var(--accent-dim)] text-[var(--accent)]">{m.lang}</span>
                   <span className="text-[10px] text-[var(--muted)] font-mono">
                     ⭐ {m.stars}
                   </span>
-                  <span
-                    className="text-[10px] px-2 py-0.5 rounded-full"
-                    style={{
-                      background: "rgba(63,185,80,0.1)",
-                      color: "var(--success)",
-                    }}
-                  >
+                  <span className="tag" style={{ background: "rgba(63,185,80,0.1)", color: "#3fb950", borderColor: "rgba(63,185,80,0.2)" }}>
                     {m.label}
                   </span>
                 </div>
@@ -207,56 +195,143 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Features */}
-        <div className="grid sm:grid-cols-3 gap-4 mb-20">
-          {FEATURES.map((f, i) => (
-            <div
-              key={i}
-              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-bright)] transition-colors"
-            >
-              <div className="w-9 h-9 rounded-lg bg-[var(--accent-dim)] text-[var(--accent)] flex items-center justify-center mb-4">
-                {f.icon}
+        {/* How it works */}
+        <div className="mb-24">
+          <div className="text-center mb-12">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-3">
+              How it works
+            </h2>
+            <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
+              Three steps from zero to your first contribution match.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              { step: "01", title: "Connect GitHub", desc: "Sign in with OAuth. We read your public repos, languages, and commit history. No private access, no stored credentials." },
+              { step: "02", title: "Build your fingerprint", desc: "Our analyzer maps your skills across categories — frontend, backend, DevOps, ML, systems. A radar you can actually read." },
+              { step: "03", title: "Get matched daily", desc: "New issues from indexed repos are scored against your profile. Your feed updates every 6 hours. Save, search, track." },
+            ].map((step) => (
+              <div key={step.step} className="p-6 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+                <div className="text-xs font-mono text-[var(--accent)] mb-3">
+                  {step.step}
+                </div>
+                <h3 className="font-display font-bold text-[var(--foreground)] mb-2">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-[var(--muted)] leading-relaxed">
+                  {step.desc}
+                </p>
               </div>
-              <h3 className="font-display font-bold text-[var(--foreground)] mb-2">
-                {f.title}
-              </h3>
-              <p className="text-sm text-[var(--muted)] leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Bottom CTA */}
-        <div className="text-center border border-[var(--border)] rounded-2xl p-10 bg-[var(--surface)]">
-          <h2 className="font-display text-3xl font-bold text-[var(--foreground)] mb-3">
-            Ready to find your next contribution?
+        {/* Features */}
+        <div className="mb-24">
+          <div className="text-center mb-12">
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-3">
+              Built different
+            </h2>
+            <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
+              Practical decisions for a practical tool.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-px bg-[var(--border)] rounded-lg overflow-hidden">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="p-6 bg-[var(--surface)]">
+                <div className="text-[var(--accent)] mb-3">{f.icon}</div>
+                <h3 className="font-semibold text-[var(--foreground)] text-sm mb-2">
+                  {f.title}
+                </h3>
+                <p className="text-sm text-[var(--muted)] leading-relaxed">
+                  {f.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Principles */}
+        <div className="mb-24">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-10">
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-3">
+                Why this exists
+              </h2>
+              <p className="text-sm text-[var(--muted)] max-w-lg mx-auto">
+                Most tools over-promise and under-deliver. We took a different approach.
+              </p>
+            </div>
+            <div className="space-y-4">
+              {PRINCIPLES.map((p) => (
+                <div key={p.label} className="flex items-start gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+                  <span className="text-xs font-mono text-[var(--accent)] font-semibold flex-shrink-0 w-20 mt-0.5">
+                    {p.label}
+                  </span>
+                  <span className="text-sm text-[var(--muted)] leading-relaxed">
+                    {p.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="text-center border border-[var(--border)] rounded-lg p-10 bg-[var(--surface)]">
+          <h2 className="font-display text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-3">
+            Ready to contribute?
           </h2>
-          <p className="text-[var(--muted)] mb-6">
-            100% free. No credit card. No email required. Just GitHub.
+          <p className="text-sm text-[var(--muted)] mb-6 max-w-md mx-auto">
+            Free. Open source. No email signup, no credit card, no data collection — just your GitHub profile.
           </p>
           <button
             onClick={handleSignIn}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[var(--accent)] text-black font-semibold hover:opacity-95 transition-opacity"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:bg-[var(--accent)]/90 transition-colors disabled:opacity-50"
           >
-            <Github size={18} />
-            Get your matches in 30 seconds
+            <Github size={16} />
+            {loading ? "Connecting..." : "Get your matches in 30 seconds"}
+            <ArrowRight size={15} />
           </button>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
-        <p>
-          Built with ❤️ for the open source community.{" "}
-          <a
-            href="https://github.com/Paul-Bryton-Raj/IssueCompass"
-            className="text-[var(--accent)] hover:opacity-80"
-          >
-            MIT License
-          </a>
-          .
-        </p>
+      <footer className="border-t border-[var(--border)] py-8 px-6">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[var(--muted)]">
+          <div className="flex items-center gap-2">
+            <GitCommit size={13} />
+            <span>IssueCompass — MIT License</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/PaulBrytonRaj18/IssueCompass"
+              target="_blank"
+              className="hover:text-[var(--foreground)] transition-colors flex items-center gap-1.5"
+            >
+              <Github size={13} />
+              Source
+            </a>
+            <a
+              href="https://github.com/PaulBrytonRaj18/IssueCompass/blob/main/CONTRIBUTING.md"
+              target="_blank"
+              className="hover:text-[var(--foreground)] transition-colors flex items-center gap-1.5"
+            >
+              <BookOpen size={13} />
+              Contributing
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
+  );
+}
+
+function Star({ size }: { size?: number }) {
+  return (
+    <svg width={size ?? 15} height={size ?? 15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
   );
 }

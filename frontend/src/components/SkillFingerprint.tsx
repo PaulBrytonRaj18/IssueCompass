@@ -65,9 +65,9 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
 
   const stats = useMemo(
     () => [
-      { icon: <GitBranch size={14} />, label: "Repos", value: total_repos },
+      { icon: <GitBranch size={13} />, label: "Repos", value: total_repos },
       {
-        icon: <Star size={14} />,
+        icon: <Star size={13} />,
         label: "Stars",
         value:
           total_stars_received >= 1000
@@ -75,7 +75,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
             : total_stars_received,
       },
       {
-        icon: <Code2 size={14} />,
+        icon: <Code2 size={13} />,
         label: "Skills",
         value: top_skills.length,
       },
@@ -84,26 +84,26 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
   );
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className="flex flex-col items-center p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]"
+            className="flex flex-col items-center p-2.5 rounded-md bg-[var(--surface-2)] border border-[var(--border)]"
           >
-            <div className="text-[var(--muted)] mb-1">{stat.icon}</div>
-            <div className="text-lg font-bold font-mono text-[var(--accent)]">
+            <div className="text-[var(--muted)] mb-0.5">{stat.icon}</div>
+            <div className="text-sm font-bold font-mono text-[var(--accent)] tabular-nums">
               {stat.value}
             </div>
-            <div className="text-[10px] text-[var(--muted)]">{stat.label}</div>
+            <div className="text-2xs text-[var(--muted)]">{stat.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-[var(--muted)] font-mono">
-            Experience Level
+          <span className="text-2xs text-[var(--muted)] font-mono uppercase tracking-wider">
+            Experience
           </span>
           <span
             className="text-xs font-semibold"
@@ -123,22 +123,22 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         </div>
       </div>
 
-      <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-        <div className="flex items-center gap-2 mb-3">
-          <Layers size={13} className="text-[var(--muted)]" />
-          <span className="text-xs font-mono text-[var(--muted)]">Languages</span>
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Layers size={12} className="text-[var(--muted)]" />
+          <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Languages</span>
         </div>
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {topLangs.map(([lang, score]) => {
             const color =
               LANGUAGE_COLORS[lang.toLowerCase()] ?? "var(--accent)";
             return (
               <div key={lang}>
-                <div className="flex justify-between mb-1">
+                <div className="flex justify-between mb-0.5">
                   <span className="text-xs text-[var(--foreground-dim)] capitalize">
                     {lang}
                   </span>
-                  <span className="text-[10px] font-mono text-[var(--muted)]">
+                  <span className="text-2xs font-mono text-[var(--muted)] tabular-nums">
                     {Math.round(score * 100)}%
                   </span>
                 </div>
@@ -155,33 +155,31 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
       </div>
 
       {radarData.length >= 3 && (
-        <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={13} className="text-[var(--muted)]" />
-            <span className="text-xs font-mono text-[var(--muted)]">
-              Skill Distribution
-            </span>
+        <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+          <div className="flex items-center gap-2 mb-2.5">
+            <TrendingUp size={12} className="text-[var(--muted)]" />
+            <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Distribution</span>
           </div>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={170}>
             <RadarChart data={radarData}>
               <PolarGrid stroke="var(--border)" />
               <PolarAngleAxis
                 dataKey="category"
-                tick={{ fill: "var(--muted)", fontSize: 10 }}
+                tick={{ fill: "var(--muted)", fontSize: 9 }}
               />
               <Radar
                 dataKey="score"
                 stroke="var(--accent)"
                 fill="var(--accent)"
-                fillOpacity={0.15}
+                fillOpacity={0.12}
                 strokeWidth={1.5}
               />
               <Tooltip
                 contentStyle={{
                   background: "var(--surface)",
                   border: "1px solid var(--border)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
                   color: "var(--foreground)",
                 }}
               />
@@ -190,12 +188,12 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         </div>
       )}
 
-      <div className="p-4 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
-        <div className="flex items-center gap-2 mb-3">
-          <Code2 size={13} className="text-[var(--muted)]" />
-          <span className="text-xs font-mono text-[var(--muted)]">Top Skills</span>
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Code2 size={12} className="text-[var(--muted)]" />
+          <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Top Skills</span>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1">
           {top_skills.map((skill) => (
             <span key={skill} className="skill-badge">
               {skill}

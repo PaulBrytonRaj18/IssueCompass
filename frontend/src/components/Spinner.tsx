@@ -14,7 +14,7 @@ export function Spinner({ size = 20 }: { size?: number }) {
         r="10"
         stroke="currentColor"
         strokeWidth="2"
-        strokeOpacity="0.2"
+        strokeOpacity="0.15"
       />
       <path
         d="M12 2a10 10 0 0 1 10 10"
@@ -28,8 +28,8 @@ export function Spinner({ size = 20 }: { size?: number }) {
 
 export function PageLoader({ message = "Loading..." }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <Spinner size={32} />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+      <Spinner size={28} />
       <p className="text-sm text-[var(--muted)] font-mono">{message}</p>
     </div>
   );

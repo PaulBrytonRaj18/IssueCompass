@@ -108,58 +108,55 @@ export default function MaintainerPage() {
     <>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Shield size={20} className="text-[var(--accent)]" />
-              <h1 className="font-display text-2xl font-bold text-[var(--foreground)]">
-                Maintainer Dashboard
-              </h1>
-            </div>
+            <h1 className="font-display text-xl font-bold text-[var(--foreground)]">
+              Maintainer Dashboard
+            </h1>
             <p className="text-sm text-[var(--muted)]">
               Overview of your indexed repositories and their issues
             </p>
           </div>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={11} />
             Refresh
           </button>
         </div>
 
         {error && (
-          <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--danger)] bg-[rgba(248,81,73,0.08)] mb-6">
-            <AlertCircle size={16} className="text-[var(--danger)] flex-shrink-0" />
+          <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--danger)] bg-[rgba(248,81,73,0.06)] mb-5">
+            <AlertCircle size={15} className="text-[var(--danger)] flex-shrink-0" />
             <p className="text-sm text-[var(--danger)]">{error}</p>
           </div>
         )}
 
         {overview && repos.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard
               label="Your Repos"
               value={(overview as MaintainerOverview).total_repos}
-              icon={<GitFork size={16} />}
+              icon={<GitFork size={14} />}
               color="var(--accent)"
             />
             <StatCard
               label="Open Issues"
               value={(overview as MaintainerOverview).total_open_issues}
-              icon={<Bug size={16} />}
+              icon={<Bug size={14} />}
               color="#58a6ff"
             />
             <StatCard
               label="Good First Issues"
               value={(overview as MaintainerOverview).total_good_first_issues}
-              icon={<BookmarkCheck size={16} />}
+              icon={<BookmarkCheck size={14} />}
               color="#3fb950"
             />
             <StatCard
               label="Help Wanted"
               value={(overview as MaintainerOverview).total_help_wanted_issues}
-              icon={<AlertCircle size={16} />}
+              icon={<AlertCircle size={14} />}
               color="#e3b341"
             />
           </div>
@@ -167,13 +164,13 @@ export default function MaintainerPage() {
 
         {repos.length === 0 && !error && (
           <EmptyState
-            icon={<Shield size={22} />}
+            icon={<Shield size={20} />}
             title="No indexed repositories found"
             description="Repositories you own on GitHub need to be indexed first. Go to the Dashboard and click 'Index Issues Now', or ensure your repos are public."
             action={
               <button
                 onClick={() => router.push("/dashboard")}
-                className="px-6 py-2.5 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold"
+                className="px-5 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold"
               >
                 Go to Dashboard
               </button>
@@ -182,11 +179,11 @@ export default function MaintainerPage() {
         )}
 
         {repos.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {repos.map((repo) => (
               <div
                 key={repo.id}
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden transition-colors"
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden transition-colors"
               >
                 <button
                   onClick={() => openRepoDetail(repo.id)}
@@ -195,9 +192,9 @@ export default function MaintainerPage() {
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="flex-shrink-0">
                       {expandedRepo === repo.id ? (
-                        <ChevronDown size={16} className="text-[var(--accent)]" />
+                        <ChevronDown size={14} className="text-[var(--accent)]" />
                       ) : (
-                        <ChevronRight size={16} className="text-[var(--muted)]" />
+                        <ChevronRight size={14} className="text-[var(--muted)]" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -207,7 +204,7 @@ export default function MaintainerPage() {
                         </span>
                         {repo.primary_language && (
                           <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{
                               background:
                                 LANGUAGE_COLORS[repo.primary_language.toLowerCase()] ?? "#8b949e",
@@ -225,7 +222,7 @@ export default function MaintainerPage() {
 
                   <div className="flex items-center gap-4 flex-shrink-0 ml-4">
                     <div className="flex items-center gap-1 text-xs text-[var(--muted)]">
-                      <Star size={12} />
+                      <Star size={11} />
                       {repo.stars}
                     </div>
                     <RepoMetric
@@ -253,7 +250,7 @@ export default function MaintainerPage() {
                         Loading details...
                       </div>
                     ) : (
-                      <div className="p-4 space-y-6">
+                      <div className="p-4 space-y-5">
                         <div>
                           <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider mb-3">
                             Open Issues ({(repoDetail as MaintainerRepoDetail)?.issues?.length ?? 0})
@@ -263,18 +260,18 @@ export default function MaintainerPage() {
                               No open issues indexed for this repo.
                             </p>
                           )}
-                          <div className="space-y-2">
+                          <div className="space-y-1">
                             {(repoDetail as MaintainerRepoDetail)?.issues?.map((issue) => (
                               <a
                                 key={issue.id}
                                 href={issue.html_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center justify-between p-3 rounded-lg bg-[var(--background)] border border-[var(--border)] hover:border-[var(--border-bright)] transition-colors group"
+                                className="flex items-center justify-between p-3 rounded-md bg-[var(--background)] border border-[var(--border)] hover:border-[var(--border-bright)] transition-colors group"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   <MessageSquare
-                                    size={12}
+                                    size={11}
                                     className="text-[var(--muted)] flex-shrink-0"
                                   />
                                   <span className="text-sm text-[var(--foreground)] truncate group-hover:text-[var(--accent)] transition-colors">
@@ -283,20 +280,20 @@ export default function MaintainerPage() {
                                 </div>
                                 <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                                   {issue.is_good_first_issue && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(63,185,80,0.12)] text-[#3fb950] font-medium">
+                                    <span className="tag text-2xs" style={{ background: "rgba(63,185,80,0.1)", color: "#3fb950", borderColor: "rgba(63,185,80,0.2)" }}>
                                       GFI
                                     </span>
                                   )}
                                   {issue.is_help_wanted && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(88,166,255,0.12)] text-[#58a6ff] font-medium">
+                                    <span className="tag text-2xs" style={{ background: "rgba(88,166,255,0.1)", color: "#58a6ff", borderColor: "rgba(88,166,255,0.2)" }}>
                                       HW
                                     </span>
                                   )}
-                                  <span className="text-xs text-[var(--muted)]">
+                                  <span className="text-xs text-[var(--muted)] font-mono">
                                     #{issue.number}
                                   </span>
                                   <ExternalLink
-                                    size={12}
+                                    size={11}
                                     className="text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity"
                                   />
                                 </div>
@@ -319,20 +316,20 @@ export default function MaintainerPage() {
                             {(contributors as ContributorMatch[])?.map((c) => (
                               <div
                                 key={c.user_id}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-[var(--background)] border border-[var(--border)]"
+                                className="flex items-center gap-3 p-3 rounded-md bg-[var(--background)] border border-[var(--border)]"
                               >
                                 {c.github_avatar_url ? (
                                   <Image
                                     src={c.github_avatar_url}
                                     alt={c.github_username}
-                                    width={32}
-                                    height={32}
-                                    className="w-8 h-8 rounded-full flex-shrink-0"
+                                    width={30}
+                                    height={30}
+                                    className="w-7 h-7 rounded-full flex-shrink-0"
                                     unoptimized
                                   />
                                 ) : (
-                                  <div className="w-8 h-8 rounded-full bg-[var(--surface-2)] flex items-center justify-center flex-shrink-0">
-                                    <Users size={14} />
+                                  <div className="w-7 h-7 rounded-full bg-[var(--surface-2)] flex items-center justify-center flex-shrink-0">
+                                    <Users size={12} />
                                   </div>
                                 )}
                                 <div className="min-w-0 flex-1">
@@ -341,7 +338,7 @@ export default function MaintainerPage() {
                                       {c.github_username}
                                     </span>
                                     <span
-                                      className="text-xs font-mono"
+                                      className="text-xs font-mono tabular-nums"
                                       style={{
                                         color:
                                           c.match_score >= 0.7
@@ -358,7 +355,7 @@ export default function MaintainerPage() {
                                     {c.matching_skills.slice(0, 3).map((skill) => (
                                       <span
                                         key={skill}
-                                        className="skill-badge text-[10px]"
+                                        className="skill-badge text-2xs"
                                       >
                                         {skill}
                                       </span>
@@ -394,12 +391,12 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-      <div className="flex items-center gap-2 mb-2" style={{ color }}>
+    <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+      <div className="flex items-center gap-2 mb-2 text-xs" style={{ color }}>
         {icon}
-        <span className="text-xs font-medium">{label}</span>
+        <span className="font-medium">{label}</span>
       </div>
-      <p className="text-2xl font-bold font-mono text-[var(--foreground)]">
+      <p className="text-xl font-bold font-mono text-[var(--foreground)] tabular-nums">
         {value}
       </p>
     </div>
@@ -416,8 +413,8 @@ function RepoMetric({
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-1 text-xs" style={{ color }}>
-      <span className="font-mono font-medium">{value}</span>
+    <div className="flex items-center gap-0.5 text-xs" style={{ color }}>
+      <span className="font-mono font-medium tabular-nums">{value}</span>
       <span className="text-[var(--muted)]">{label}</span>
     </div>
   );

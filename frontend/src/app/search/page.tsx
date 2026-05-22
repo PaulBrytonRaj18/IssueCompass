@@ -196,8 +196,8 @@ function SearchPageContent() {
     <>
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="font-display text-2xl font-bold text-[var(--foreground)] mb-1">
+        <div className="mb-6">
+          <h1 className="font-display text-xl font-bold text-[var(--foreground)] mb-0.5">
             Search Issues
           </h1>
           <p className="text-sm text-[var(--muted)]">
@@ -207,7 +207,7 @@ function SearchPageContent() {
 
         <div className="flex items-center gap-2 mb-4">
           <div className="flex-1 relative">
-            <SearchIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+            <SearchIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
             <input
               ref={inputRef}
               type="text"
@@ -218,27 +218,23 @@ function SearchPageContent() {
                 if (suggestionsQuery.data?.suggestions?.length > 0) setShowSuggestions(true);
               }}
               placeholder='e.g. "beginner React issues" or "FastAPI backend bugs"'
-              className="w-full pl-10 pr-10 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-dim)] transition-colors"
+              className="w-full pl-9 pr-9 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-dim)] transition-colors"
             />
             {query && (
               <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
-                <X size={16} />
+                <X size={15} />
               </button>
             )}
 
             {showSuggestions && suggestionsQuery.data?.suggestions && (
-              <div ref={suggestionRef} className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden animate-fade-in">
+              <div ref={suggestionRef} className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden animate-fade-in">
                 {suggestionsQuery.data.suggestions.map((s: SuggestionItem, i: number) => (
                   <button
                     key={i}
                     onClick={() => selectSuggestion(s)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-[var(--accent-dim)] transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--accent-dim)] transition-colors"
                   >
-                    {s.type === "language" ? (
-                      <SearchIcon size={14} className="text-[var(--muted)]" />
-                    ) : (
-                      <SearchIcon size={14} className="text-[var(--muted)]" />
-                    )}
+                    <SearchIcon size={13} className="text-[var(--muted)]" />
                     <span className="text-[var(--foreground)] font-medium">{s.text}</span>
                     {s.description && (
                       <span className="text-[var(--muted)] text-xs ml-auto">{s.description}</span>
@@ -252,54 +248,54 @@ function SearchPageContent() {
           <button
             onClick={performSearch}
             disabled={isLoading || !query.trim()}
-            className="px-5 py-3 rounded-xl bg-[var(--accent)] text-black text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="px-4 py-2.5 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:bg-[var(--accent)]/90 transition-colors disabled:opacity-50"
           >
             {isLoading ? "Searching..." : "Search"}
           </button>
 
           <button
             onClick={() => setUseSmartSearchBool(!useSmartSearchBool)}
-            className={`p-3 rounded-xl border transition-colors ${
+            className={`p-2.5 rounded-lg border transition-colors ${
               useSmartSearchBool
                 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]"
                 : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
             }`}
             title={useSmartSearchBool ? "Smart search enabled" : "Toggle smart search"}
           >
-            <Sparkles size={16} />
+            <Sparkles size={15} />
           </button>
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`p-3 rounded-xl border transition-colors ${
+            className={`p-2.5 rounded-lg border transition-colors ${
               showFilters
                 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]"
                 : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
             }`}
             title="Toggle filters"
           >
-            <SlidersHorizontal size={16} />
+            <SlidersHorizontal size={15} />
           </button>
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-3 mb-6 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] animate-fade-in">
-            <Filter size={14} className="text-[var(--muted)]" />
+          <div className="flex flex-wrap items-center gap-3 mb-5 p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] animate-fade-in">
+            <Filter size={13} className="text-[var(--muted)]" />
             <select value={language} onChange={(e) => setLanguage(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
+              className="px-2.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
               <option value="">All Languages</option>
               {LANGUAGES.filter(Boolean).map((l) => (
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
+              className="px-2.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
               {DIFFICULTIES.map((d) => (
                 <option key={d.value} value={d.value}>{d.label}</option>
               ))}
             </select>
             <select value={labelFilter} onChange={(e) => setLabelFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
+              className="px-2.5 py-1.5 rounded-md text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:border-[var(--border-bright)]">
               {LABEL_FILTERS.map((l) => (
                 <option key={l.value} value={l.value}>{l.label}</option>
               ))}
@@ -308,60 +304,60 @@ function SearchPageContent() {
         )}
 
         {!isLoading && searched && isSmart && (
-          <div className="flex items-center gap-2 mb-4 text-xs text-[var(--muted)]">
-            <Sparkles size={12} className="text-[var(--accent)]" />
+          <div className="flex items-center gap-2 mb-4 text-xs text-[var(--muted)] flex-wrap">
+            <Sparkles size={11} className="text-[var(--accent)]" />
             <span>Smart search</span>
             {smartResult?.intent?.languages && smartResult.intent.languages.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)]">
+              <span className="tag border-[var(--accent-dim)] text-[var(--accent)]">
                 {smartResult.intent.languages.join(", ")}
               </span>
             )}
             {smartResult?.intent?.difficulty && (
-              <span className="px-2 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)]">
+              <span className="tag border-[var(--accent-dim)] text-[var(--accent)]">
                 {smartResult.intent.difficulty}
               </span>
             )}
             {smartResult?.intent?.labels?.map((l: string) => (
-              <span key={l} className="px-2 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)]">
+              <span key={l} className="tag border-[var(--accent-dim)] text-[var(--accent)]">
                 {l.replace("_", " ")}
               </span>
             ))}
             {smartResult?.personalized && (
-              <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">
+              <span className="tag" style={{ background: "rgba(88,166,255,0.1)", color: "#58a6ff", borderColor: "rgba(88,166,255,0.2)" }}>
                 personalized
               </span>
             )}
             <button
               onClick={() => setShowSaveDialog(true)}
-              className="ml-auto px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] flex items-center gap-1"
+              className="ml-auto px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] flex items-center gap-1 text-2xs"
             >
-              <Bookmark size={12} />
+              <Bookmark size={11} />
               Save
             </button>
           </div>
         )}
 
         {showSaveDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-[var(--surface)] rounded-xl p-6 w-96 border border-[var(--border)] shadow-xl">
-              <h3 className="font-display font-bold text-[var(--foreground)] mb-3">Save Search</h3>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="bg-[var(--surface)] rounded-lg p-6 w-96 border border-[var(--border)] shadow-xl">
+              <h3 className="font-semibold text-[var(--foreground)] mb-3">Save Search</h3>
               <input
                 type="text"
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
                 placeholder="e.g. Daily React beginner issues"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm mb-4 focus:outline-none focus:border-[var(--accent)]"
+                className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm mb-4 focus:outline-none focus:border-[var(--accent)]"
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && saveSearch()}
               />
               <div className="flex justify-end gap-2">
                 <button onClick={() => setShowSaveDialog(false)}
-                  className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+                  className="px-3 py-2 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
                   Cancel
                 </button>
                 <button onClick={saveSearch}
                   disabled={!saveName.trim() || saveSearchMutation.isPending}
-                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+                  className="px-3 py-2 rounded-md bg-[var(--accent)] text-black text-xs font-semibold hover:bg-[var(--accent)]/90 disabled:opacity-50">
                   Save
                 </button>
               </div>
@@ -373,12 +369,12 @@ function SearchPageContent() {
 
         {!isLoading && searched && matches.length === 0 && (
           <EmptyState
-            icon={<SearchIcon size={22} />}
+            icon={<SearchIcon size={20} />}
             title="No issues found"
             description={`No results for "${query}". Try different keywords or fewer filters.`}
             action={
               <button onClick={() => { setDifficulty(""); setLabelFilter(""); setLanguage(""); }}
-                className="px-4 py-2 rounded-lg border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                className="px-4 py-2 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
                 Clear Filters
               </button>
             }
@@ -390,7 +386,7 @@ function SearchPageContent() {
             <p className="text-xs text-[var(--muted)] mb-4 font-mono">
               {results?.total ?? matches.length} result{matches.length !== 1 ? "s" : ""} for &ldquo;{query}&rdquo;
             </p>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {matches.map((match: MatchedIssue, i: number) => (
                 <IssueCard key={`${match.issue.id}-${i}`} match={match} index={i} />
               ))}
@@ -400,13 +396,13 @@ function SearchPageContent() {
 
         {!isLoading && !searched && (
           <div className="py-20 text-center">
-            <SearchIcon size={32} className="mx-auto mb-4 text-[var(--muted)]" />
-            <h3 className="font-display font-bold text-[var(--foreground)] text-lg mb-2">
+            <SearchIcon size={28} className="mx-auto mb-4 text-[var(--muted)]" />
+            <h3 className="font-semibold text-[var(--foreground)] text-base mb-1.5">
               Search Open Source Issues
             </h3>
             <p className="text-sm text-[var(--muted)] max-w-md mx-auto">
               Type a query like &ldquo;beginner React issues&rdquo; or &ldquo;FastAPI performance bugs&rdquo; and press Enter.
-              Toggle <Sparkles size={12} className="inline" /> for smart search with auto-detected intent.
+              Toggle <Sparkles size={11} className="inline" /> for smart search with auto-detected intent.
             </p>
           </div>
         )}

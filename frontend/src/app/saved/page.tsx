@@ -1,7 +1,7 @@
 "use client";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Bookmark, ExternalLink, GitBranch } from "lucide-react";
+import { Bookmark, ExternalLink } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { EmptyState } from "@/components/EmptyState";
 import { PageLoader } from "@/components/Spinner";
@@ -29,11 +29,11 @@ export default function SavedPage() {
     <>
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="font-display text-2xl font-bold text-[var(--foreground)]">
+        <div className="mb-5">
+          <h1 className="font-display text-xl font-bold text-[var(--foreground)]">
             Saved Issues
           </h1>
-          <p className="text-sm text-[var(--muted)] mt-0.5">
+          <p className="text-sm text-[var(--muted)]">
             {issueList.length > 0
               ? `${issueList.length} issue${issueList.length !== 1 ? "s" : ""} saved`
               : "Issues you bookmark will appear here"}
@@ -42,20 +42,20 @@ export default function SavedPage() {
 
         {issueList.length === 0 ? (
           <EmptyState
-            icon={<Bookmark size={22} />}
+            icon={<Bookmark size={20} />}
             title="No saved issues yet"
             description="When you bookmark an issue from your matches, it shows up here for easy access."
             action={
               <button
                 onClick={() => router.push("/dashboard")}
-                className="px-6 py-2.5 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold"
+                className="px-5 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold"
               >
                 Browse Matches
               </button>
             }
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {issueList.map((issue: Issue, i: number) => {
               const repo = issue.repository;
               const langColor =
@@ -64,7 +64,7 @@ export default function SavedPage() {
               return (
                 <div
                   key={issue.id}
-                  className="glass rounded-xl border border-[var(--border)] hover:border-[var(--border-bright)] transition-all p-4 animate-fade-in"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] transition-colors p-4 animate-fade-in"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -88,7 +88,7 @@ export default function SavedPage() {
                           </span>
                         )}
                         <span
-                          className="font-mono text-[10px]"
+                          className="font-mono text-2xs"
                           style={{ color: complexityColor(issue.complexity_score) }}
                         >
                           {complexityLabel(issue.complexity_score)}
@@ -98,10 +98,11 @@ export default function SavedPage() {
                         )}
                         {issue.is_good_first_issue && (
                           <span
-                            className="px-2 py-0.5 rounded-full text-[10px]"
+                            className="tag text-2xs"
                             style={{
-                              background: "rgba(63,185,80,0.12)",
+                              background: "rgba(63,185,80,0.1)",
                               color: "#3fb950",
+                              borderColor: "rgba(63,185,80,0.2)",
                             }}
                           >
                             good first issue
@@ -113,10 +114,10 @@ export default function SavedPage() {
                       href={issue.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
+                      className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
                     >
                       Open
-                      <ExternalLink size={11} />
+                      <ExternalLink size={10} />
                     </a>
                   </div>
                 </div>

@@ -50,14 +50,11 @@ export default function TrendingPage() {
     <>
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Flame size={22} className="text-[var(--accent)]" />
-              <h1 className="font-display text-2xl font-bold text-[var(--foreground)]">
-                Trending Issues
-              </h1>
-            </div>
+            <h1 className="font-display text-xl font-bold text-[var(--foreground)]">
+              Trending Issues
+            </h1>
             <p className="text-sm text-[var(--muted)]">
               Popular good-first-issues from active repositories across GitHub.
             </p>
@@ -65,23 +62,23 @@ export default function TrendingPage() {
           <button
             onClick={() => refetch()}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <RefreshCw size={11} className={isLoading ? "animate-spin" : ""} />
             Refresh
           </button>
         </div>
 
-        <div className="flex items-center gap-2 mb-6">
-          <TrendingUp size={13} className="text-[var(--muted)]" />
+        <div className="flex items-center gap-2 mb-5">
+          <TrendingUp size={12} className="text-[var(--muted)]" />
           <div className="flex items-center gap-1 flex-wrap">
             {LANGUAGES.map((lang) => (
               <button
                 key={lang}
                 onClick={() => setLanguage(lang)}
-                className={`px-3 py-1 rounded-lg text-xs font-mono transition-colors ${
+                className={`px-2.5 py-1 rounded-md text-2xs font-mono transition-colors ${
                   language === lang
-                    ? "bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent-dim)]"
+                    ? "bg-[var(--accent-dim)] text-[var(--accent)]"
                     : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
@@ -95,14 +92,14 @@ export default function TrendingPage() {
 
         {!isLoading && matches.length === 0 && (
           <EmptyState
-            icon={<Flame size={22} />}
+            icon={<Flame size={20} />}
             title="No trending issues"
             description="No trending issues found for this language right now. Try another language or check back later."
           />
         )}
 
         {!isLoading && matches.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {matches.map((match: MatchedIssue, i: number) => (
               <IssueCard key={`${match.issue.id}-${i}`} match={match} index={i} />
             ))}

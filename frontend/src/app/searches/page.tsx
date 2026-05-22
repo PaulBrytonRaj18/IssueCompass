@@ -73,8 +73,8 @@ export default function SavedSearchesPage() {
     <>
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="font-display text-2xl font-bold text-[var(--foreground)] mb-1">
+        <div className="mb-6">
+          <h1 className="font-display text-xl font-bold text-[var(--foreground)] mb-0.5">
             Saved Searches
           </h1>
           <p className="text-sm text-[var(--muted)]">
@@ -86,13 +86,13 @@ export default function SavedSearchesPage() {
 
         {!isLoading && searchList.length === 0 && (
           <EmptyState
-            icon={<Search size={22} />}
+            icon={<Search size={20} />}
             title="No saved searches"
             description="Run a search on the Search page and save it to track new issues."
             action={
               <button
                 onClick={() => router.push("/search")}
-                className="px-4 py-2 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold"
+                className="px-4 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold"
               >
                 Go to Search
               </button>
@@ -101,11 +101,11 @@ export default function SavedSearchesPage() {
         )}
 
         {!isLoading && searchList.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {searchList.map((s: SavedSearch) => (
               <div
                 key={s.id}
-                className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] flex items-center gap-4"
+                className="p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] flex items-center gap-4"
               >
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-[var(--foreground)] text-sm truncate">
@@ -124,40 +124,40 @@ export default function SavedSearchesPage() {
                   <button
                     onClick={() => handleCheck(s.id)}
                     disabled={checkMutation.isPending}
-                    className="p-2 rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors disabled:opacity-50"
+                    className="p-1.5 rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors disabled:opacity-50"
                     title="Check for new issues"
                   >
-                    <RefreshCw size={14} className={checkMutation.isPending ? "animate-spin" : ""} />
+                    <RefreshCw size={13} className={checkMutation.isPending ? "animate-spin" : ""} />
                   </button>
 
                   <button
                     onClick={() => router.push(`/search?q=${encodeURIComponent(s.query)}`)}
-                    className="p-2 rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
+                    className="p-1.5 rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
                     title="Run search"
                   >
-                    <ExternalLink size={14} />
+                    <ExternalLink size={13} />
                   </button>
 
                   <button
                     onClick={() => handleToggleNotify(s)}
                     disabled={updateMutation.isPending}
-                    className={`p-2 rounded-lg border transition-colors disabled:opacity-50 ${
+                    className={`p-1.5 rounded-md border transition-colors disabled:opacity-50 ${
                       s.notify
                         ? "border-[var(--accent)] text-[var(--accent)]"
                         : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
                     }`}
                     title={s.notify ? "Notifications on" : "Notifications off"}
                   >
-                    {s.notify ? <Bell size={14} /> : <BellOff size={14} />}
+                    {s.notify ? <Bell size={13} /> : <BellOff size={13} />}
                   </button>
 
                   <button
                     onClick={() => handleDelete(s.id)}
                     disabled={deleteMutation.isPending}
-                    className="p-2 rounded-lg border border-[var(--border)] text-[var(--muted)] hover:text-red-400 hover:border-red-400/30 transition-colors disabled:opacity-50"
+                    className="p-1.5 rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-red-400 hover:border-red-400/30 transition-colors disabled:opacity-50"
                     title="Delete"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>

@@ -37,9 +37,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="animate-fade-in px-4 py-3 rounded-xl border shadow-xl text-sm font-medium max-w-sm"
+            className="animate-fade-in px-4 py-2.5 rounded-lg border shadow-lg text-sm max-w-sm bg-[var(--surface)]"
             style={{
-              background: "var(--surface)",
               borderColor:
                 t.type === "success" ? "var(--success)" :
                 t.type === "error" ? "var(--danger)" :

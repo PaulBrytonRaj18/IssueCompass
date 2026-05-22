@@ -78,6 +78,5 @@ jobs:
     needs: [backend, frontend]
     steps:
       - name: Trigger Render Deploy Hook
-        run: |
-          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-        timeout: 30000
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+        timeout-minutes: 1

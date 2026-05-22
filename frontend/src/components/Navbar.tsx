@@ -7,13 +7,13 @@ import { usePathname } from "next/navigation";
 import { Github, LayoutDashboard, Bookmark, LogOut, User, Search, TrendingUp, Save, Shield } from "lucide-react";
 
 const NAV_LINKS = [
-  { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={15} /> },
-  { href: "/search", label: "Search", icon: <Search size={15} /> },
-  { href: "/trending", label: "Trending", icon: <TrendingUp size={15} /> },
-  { href: "/saved", label: "Saved", icon: <Bookmark size={15} /> },
-  { href: "/searches", label: "Searches", icon: <Save size={15} /> },
-  { href: "/maintainer", label: "Maintain", icon: <Shield size={15} /> },
-  { href: "/profile", label: "Profile", icon: <User size={15} /> },
+  { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={14} /> },
+  { href: "/search", label: "Search", icon: <Search size={14} /> },
+  { href: "/trending", label: "Trending", icon: <TrendingUp size={14} /> },
+  { href: "/saved", label: "Saved", icon: <Bookmark size={14} /> },
+  { href: "/searches", label: "Searches", icon: <Save size={14} /> },
+  { href: "/maintainer", label: "Maintain", icon: <Shield size={14} /> },
+  { href: "/profile", label: "Profile", icon: <User size={14} /> },
 ];
 
 export const Navbar = memo(function Navbar() {
@@ -28,30 +28,26 @@ export const Navbar = memo(function Navbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background)]">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-        <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-          <Image
-            src="/logo.svg"
-            alt="IssueCompass"
-            width={36}
-            height={36}
-            className="w-9 h-9"
-          />
-          <span className="font-display font-bold text-base text-[var(--foreground)] hidden sm:inline">
+        <Link href="/dashboard" className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="w-8 h-8 rounded-md bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center">
+            <span className="font-mono font-bold text-xs text-[var(--accent)]">IC</span>
+          </div>
+          <span className="font-display font-bold text-sm text-[var(--foreground)] hidden sm:inline">
             IssueCompass
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1" aria-label="Main navigation">
+        <nav className="flex items-center gap-0.5" aria-label="Main navigation">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               aria-current={pathname === link.href ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 pathname === link.href
-                  ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+                  ? "bg-[var(--surface-2)] text-[var(--accent)]"
                   : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)]"
               }`}
             >
@@ -65,41 +61,42 @@ export const Navbar = memo(function Navbar() {
           <div className="relative">
             <button
               onClick={toggleMenu}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-[var(--surface)] transition-colors"
+              className="flex items-center gap-2 p-1 rounded-md hover:bg-[var(--surface)] transition-colors"
             >
               {user?.avatarUrl ? (
                 <Image
                   src={user.avatarUrl}
                   alt="avatar"
-                  width={28}
-                  height={28}
+                  width={26}
+                  height={26}
                   className="rounded-full"
                 />
               ) : (
-                <div className="w-7 h-7 rounded-full bg-[var(--surface-2)] flex items-center justify-center">
-                  <User size={14} />
+                <div className="w-6 h-6 rounded-full bg-[var(--surface-2)] flex items-center justify-center">
+                  <User size={12} />
                 </div>
               )}
-              <span className="text-sm text-[var(--foreground-dim)] hidden sm:inline">
+              <span className="text-xs text-[var(--foreground-dim)] hidden sm:inline font-medium">
                 {user?.username}
               </span>
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-44 glass rounded-xl shadow-xl border border-[var(--border)] overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden">
                 <a
                   href={`https://github.com/${user?.username}`}
                   target="_blank"
-                  className="flex items-center gap-2 px-4 py-3 text-sm text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] transition-colors"
+                  className="flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] transition-colors"
                 >
-                  <Github size={14} />
+                  <Github size={13} />
                   GitHub Profile
                 </a>
+                <div className="border-t border-[var(--border)]" />
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-sm text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
                 >
-                  <LogOut size={14} />
+                  <LogOut size={13} />
                   Sign out
                 </button>
               </div>

@@ -127,48 +127,46 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex gap-8">
           <aside className="hidden lg:block w-72 flex-shrink-0">
-            <div className="sticky top-20 space-y-4">
-              <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold text-[var(--foreground)]">
-                    Hey, {user?.name?.split(" ")[0] || user?.username} 👋
-                  </span>
-                </div>
-                <p className="text-xs text-[var(--muted)]">
-                  Here are your personalized issue matches.
+            <div className="sticky top-20 space-y-5">
+              <div className="px-1">
+                <p className="text-xs font-mono text-[var(--muted)] mb-1">
+                  Signed in as <span className="text-[var(--foreground-dim)]">{user?.username}</span>
                 </p>
+                <h2 className="font-display font-bold text-lg text-[var(--foreground)]">
+                  Your Matches
+                </h2>
               </div>
 
               {fingerprint ? (
-                <>
+                <div className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <span className="text-xs font-mono text-[var(--muted)]">
-                      Your Skill Fingerprint
+                      Skill Fingerprint
                     </span>
                     <button
                       onClick={handleReanalyze}
                       disabled={analyzing}
-                      className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
+                      className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50 text-xs"
                       title="Refresh skill analysis"
                     >
                       <RefreshCw
-                        size={12}
+                        size={11}
                         className={analyzing ? "animate-spin" : ""}
                       />
                     </button>
                   </div>
                   <SkillFingerprintPanel fingerprint={fingerprint} />
-                </>
+                </div>
               ) : (
-                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-center">
-                  <Zap size={20} className="text-[var(--accent)] mx-auto mb-2" />
+                <div className="p-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-center">
+                  <Zap size={18} className="text-[var(--accent)] mx-auto mb-2" />
                   <p className="text-xs text-[var(--muted)]">
                     Building your skill fingerprint from GitHub...
                   </p>
                   <button
                     onClick={handleReanalyze}
                     disabled={analyzing}
-                    className="mt-3 text-xs text-[var(--accent)] hover:opacity-80"
+                    className="mt-2 text-xs text-[var(--accent)] hover:opacity-80"
                   >
                     {analyzing ? "Analyzing..." : "Re-analyze"}
                   </button>
@@ -178,36 +176,33 @@ export default function DashboardPage() {
           </aside>
 
           <main className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h1 className="font-display text-2xl font-bold text-[var(--foreground)]">
-                  Your Matches
-                </h1>
-                <p className="text-sm text-[var(--muted)] mt-0.5">
+                <p className="text-xs font-mono text-[var(--muted)]">
                   {matches.length > 0
                     ? `${matches.length} issues matched to your skills`
-                    : "No matches yet — try indexing issues"}
+                    : "No matches yet"}
                 </p>
               </div>
               <button
                 onClick={() => refetchMatches()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] transition-colors"
               >
-                <RefreshCw size={12} />
+                <RefreshCw size={11} />
                 Refresh
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 mb-6">
-              <Filter size={13} className="text-[var(--muted)]" />
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <Filter size={12} className="text-[var(--muted)]" />
               <div className="flex items-center gap-1 flex-wrap">
                 {LANGUAGES.map((lang) => (
                   <button
                     key={lang}
                     onClick={() => setLangFilter(lang)}
-                    className={`px-3 py-1 rounded-lg text-xs font-mono transition-colors ${
+                    className={`px-2.5 py-1 rounded-md text-2xs font-mono transition-colors ${
                       langFilter === lang
-                        ? "bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent-dim)]"
+                        ? "bg-[var(--accent-dim)] text-[var(--accent)]"
                         : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]"
                     }`}
                   >
@@ -218,7 +213,7 @@ export default function DashboardPage() {
               <select
                 value={labelFilter}
                 onChange={(e) => setLabelFilter(e.target.value)}
-                className="ml-auto px-3 py-1 rounded-lg text-xs border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] focus:outline-none focus:border-[var(--border-bright)]"
+                className="ml-auto px-2.5 py-1 rounded-md text-xs border border-[var(--border)] bg-[var(--background)] text-[var(--muted)] focus:outline-none focus:border-[var(--border-bright)]"
               >
                 {LABELS.map((l) => (
                   <option key={l.value} value={l.value}>
@@ -229,8 +224,8 @@ export default function DashboardPage() {
             </div>
 
             {matchesError && (
-              <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--danger)] bg-[rgba(248,81,73,0.08)] mb-6">
-                <AlertCircle size={16} className="text-[var(--danger)] flex-shrink-0" />
+              <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--danger)] bg-[rgba(248,81,73,0.06)] mb-5">
+                <AlertCircle size={15} className="text-[var(--danger)] flex-shrink-0" />
                 <div>
                   <p className="text-sm text-[var(--danger)] font-medium">
                     Connection Error
@@ -254,7 +249,7 @@ export default function DashboardPage() {
 
             {!isInitialLoading && noMatches && !matchesError && (
               <EmptyState
-                icon={<Zap size={22} />}
+                icon={<Zap size={20} />}
                 title={noSkills ? "Building your fingerprint" : "No matches yet"}
                 description={
                   noSkills
@@ -268,7 +263,7 @@ export default function DashboardPage() {
                       setTimeout(() => refetchMatches(), 3000);
                     }}
                     disabled={indexMutation.isPending}
-                    className="px-6 py-2.5 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold disabled:opacity-60"
+                    className="px-5 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold disabled:opacity-60"
                   >
                     {indexMutation.isPending ? "Indexing..." : "Index Issues Now"}
                   </button>
@@ -277,7 +272,7 @@ export default function DashboardPage() {
             )}
 
             {!noMatches && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {matches.map((match: MatchedIssue, i: number) => (
                   <IssueCard key={match.issue.id} match={match} index={i} />
                 ))}
