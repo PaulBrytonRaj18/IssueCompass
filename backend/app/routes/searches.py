@@ -170,7 +170,7 @@ async def check_saved_search(
     if not saved:
         raise HTTPException(status_code=404, detail="Saved search not found")
 
-    results = await search_service.smart_search(
+    search_results, _search_intent = await search_service.smart_search(
         db=db,
         query=saved.query,
         user=user,
@@ -181,7 +181,7 @@ async def check_saved_search(
     new_count = 0
     if saved.last_checked_at:
         new_count = sum(
-            1 for r in results
+            1 for r in search_results
             if r["issue"].created_at and r["issue"].created_at > saved.last_checked_at
         )
 
@@ -189,6 +189,6 @@ async def check_saved_search(
     await db.commit()
 
     return {
-        "total_results": len(results),
+        "total_results": len(search_results),
         "new_since_last_check": new_count,
     }

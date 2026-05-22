@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import and_, func, select
+from sqlalchemy import Integer, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get, cache_set
@@ -54,10 +54,10 @@ async def get_maintainer_overview(
 
     repo_full_names = [r["full_name"] for r in repos_data if not r.get("fork") and not r.get("archived")]
 
-    result = await db.execute(
+    repo_result = await db.execute(
         select(Repository).where(Repository.full_name.in_(repo_full_names))
     )
-    indexed_repos = {r.full_name: r for r in result.scalars().all()}
+    indexed_repos = {r.full_name: r for r in repo_result.scalars().all()}
 
     if not indexed_repos:
         return MaintainerOverview(
@@ -71,8 +71,8 @@ async def get_maintainer_overview(
         select(
             Issue.repository_id,
             func.count(Issue.id).label("total"),
-            func.sum(func.cast(Issue.is_good_first_issue, func.Integer())).label("gfi"),
-            func.sum(func.cast(Issue.is_help_wanted, func.Integer())).label("hw"),
+            func.sum(func.cast(Issue.is_good_first_issue, Integer)).label("gfi"),
+            func.sum(func.cast(Issue.is_help_wanted, Integer)).label("hw"),
             func.avg(Issue.complexity_score).label("avg_cx"),
         ).where(
             and_(
@@ -107,9 +107,9 @@ async def get_maintainer_overview(
                 forks=db_repo.forks,
                 primary_language=db_repo.primary_language,
                 open_issues_count=db_repo.open_issues_count,
-                total_issues=stats["total_issues"],
-                good_first_issues=stats["gfi_count"],
-                help_wanted_issues=stats["hw_count"],
+                total_issues=int(stats["total_issues"]),
+                good_first_issues=int(stats["gfi_count"]),
+                help_wanted_issues=int(stats["hw_count"]),
                 avg_complexity=stats["avg_complexity"],
             )
         )
@@ -118,7 +118,7 @@ async def get_maintainer_overview(
     total_gfi = sum(r.good_first_issues for r in maintainer_repos)
     total_hw = sum(r.help_wanted_issues for r in maintainer_repos)
 
-    result = MaintainerOverview(
+    overview = MaintainerOverview(
         total_repos=len(maintainer_repos),
         total_open_issues=total_open,
         total_good_first_issues=total_gfi,
@@ -126,8 +126,8 @@ async def get_maintainer_overview(
         total_potential_contributors=0,
         repos=maintainer_repos,
     )
-    await cache_set(cache_key, result.model_dump(), ttl=300)
-    return result
+    await cache_set(cache_key, overview.model_dump(), ttl=300)
+    return overview
 
 
 @router.get("/repos/{repo_id}", response_model=MaintainerRepoDetail)
@@ -246,7 +246,7 @@ async def get_suggested_contributors(
     if not repo_issues:
         return []
 
-    all_required_skills = set()
+    all_required_skills: set[str] = set()
     for issue in repo_issues:
         if issue.required_skills:
             skills = issue.required_skills.get("skills", [])

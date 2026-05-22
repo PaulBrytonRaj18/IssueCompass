@@ -131,7 +131,7 @@ def _find_live_matching_skills(
     raw_repo: dict,
 ) -> list[str]:
     """Return skills that overlap between user fingerprint and live issue."""
-    user_set = set()
+    user_set: set[str] = set()
     user_set.update(k.lower() for k in user_skills.get("languages", {}).keys())
     user_set.update(t.lower() for t in user_skills.get("topics", []))
     user_set.update(s.lower() for s in user_skills.get("top_skills", []))
@@ -434,26 +434,29 @@ async def get_matched_issues(
         )
     )
 
-    db_results_or_err, live_results_or_err = await asyncio.gather(
+    gather_result: tuple[Any, Any] = await asyncio.gather(
         db_task, live_task, return_exceptions=True,
     )
+    db_results_or_err, live_results_or_err = gather_result
 
+    db_results: list[dict] = []
     if isinstance(db_results_or_err, Exception):
         logger.error("DB matching task failed: %s", db_results_or_err)
-        db_results = []
     else:
         db_results = db_results_or_err
 
+    live_results: list[dict] = []
     if isinstance(live_results_or_err, Exception):
         logger.error("Live GitHub fetch task failed: %s", live_results_or_err)
-        live_results = []
     else:
         live_results = live_results_or_err
 
     # ── Deduplicate: DB results win over live if same github_id ─────────────
-    db_github_ids: set[int] = {
-        r.get("_raw_github_id") for r in db_results if r.get("_raw_github_id")
-    }
+    db_github_ids: set[int] = set()
+    for r in db_results:
+        raw_id = r.get("_raw_github_id")
+        if raw_id is not None:
+            db_github_ids.add(raw_id)
     unique_live = [
         r for r in live_results if r.get("_raw_github_id") not in db_github_ids
     ]

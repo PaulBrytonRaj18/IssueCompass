@@ -80,11 +80,11 @@ async def get_matched_issues(
                 created_at=issue.get("created_at"),
                 repository=RepositoryPublic(
                     id=repo.get("id", 0) if isinstance(repo, dict) else repo.id,
-                    full_name=repo.get("full_name") if isinstance(repo, dict) else repo.full_name,
-                    name=repo.get("name") if isinstance(repo, dict) else repo.name,
+                    full_name=repo["full_name"] if isinstance(repo, dict) else repo.full_name,
+                    name=repo["name"] if isinstance(repo, dict) else repo.name,
                     description=repo.get("description") if isinstance(repo, dict) else repo.description,
-                    owner_login=repo.get("owner_login") if isinstance(repo, dict) else repo.owner_login,
-                    html_url=repo.get("html_url") if isinstance(repo, dict) else repo.html_url,
+                    owner_login=repo["owner_login"] if isinstance(repo, dict) else repo.owner_login,
+                    html_url=repo["html_url"] if isinstance(repo, dict) else repo.html_url,
                     stars=repo.get("stars", 0) if isinstance(repo, dict) else repo.stars,
                     primary_language=repo.get("primary_language") if isinstance(repo, dict) else repo.primary_language,
                     topics=repo.get("topics") if isinstance(repo, dict) else repo.topics,
@@ -96,6 +96,7 @@ async def get_matched_issues(
                 RepositoryPublic.model_validate(repo)
                 if hasattr(repo, "id")
                 else RepositoryPublic(
+                    id=0,
                     full_name=repo.get("full_name", ""),
                     name=repo.get("name", ""),
                     owner_login=repo.get("owner_login", ""),

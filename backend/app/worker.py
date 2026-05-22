@@ -103,10 +103,10 @@ async def index_language_issues(ctx, language: str, label: str = "good first iss
                 stmt = stmt.on_conflict_do_nothing(index_elements=["full_name"])
                 await db.execute(stmt)
                 await db.flush()
-                result = await db.execute(
+                repo_result = await db.execute(
                     select(Repository).where(Repository.full_name.in_(all_full_names))
                 )
-                repo_map = {r.full_name: r for r in result.scalars().all()}
+                repo_map = {r.full_name: r for r in repo_result.scalars().all()}
 
             all_github_ids = list({p["item"]["id"] for p in parsed})
             existing_issues = await db.execute(
@@ -363,4 +363,4 @@ class WorkerSettings:
 
 if __name__ == "__main__":
     from arq import run_worker
-    asyncio.run(run_worker(WorkerSettings))
+    asyncio.run(run_worker(WorkerSettings))  # type: ignore[arg-type]

@@ -114,10 +114,10 @@ async def close_db():
             pool = engine.pool
             logger.info(
                 "DB_DISPOSE: closing pool — size=%d checked_in=%d checked_out=%d overflow=%d",
-                pool.size(),
-                pool.checkedin(),
-                pool.checkedout(),
-                pool.overflow(),
+                getattr(pool, "size", lambda: -1)(),
+                getattr(pool, "checkedin", lambda: -1)(),
+                getattr(pool, "checkedout", lambda: -1)(),
+                getattr(pool, "overflow", lambda: -1)(),
             )
         except Exception:
             pass
@@ -130,10 +130,10 @@ async def get_pool_status() -> dict:
     try:
         pool = engine.pool
         return {
-            "size": pool.size(),
-            "checked_in": pool.checkedin(),
-            "checked_out": pool.checkedout(),
-            "overflow": pool.overflow(),
+            "size": getattr(pool, "size", lambda: 0)(),
+            "checked_in": getattr(pool, "checkedin", lambda: 0)(),
+            "checked_out": getattr(pool, "checkedout", lambda: 0)(),
+            "overflow": getattr(pool, "overflow", lambda: 0)(),
         }
     except Exception:
         return {"error": "pool not available"}

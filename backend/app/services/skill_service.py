@@ -85,7 +85,7 @@ def _merge_ai_fingerprint(
     total_repos = len([r for r in repos if not r.get("fork")])
     total_stars = sum(r.get("stargazers_count", 0) for r in repos if not r.get("fork"))
 
-    lang_totals = {}
+    lang_totals: dict[str, int] = {}
     for repo in repos:
         if repo.get("fork"):
             continue
