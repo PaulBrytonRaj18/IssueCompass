@@ -2,7 +2,6 @@ import logging
 from contextlib import asynccontextmanager
 
 import asyncpg
-
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
 from app.core.database import close_db, get_pool_status, init_db

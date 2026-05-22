@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import cache_get, cache_get_with_stale, cache_set
+from app.core.cache import cache_get_with_stale
 from app.core.database import get_db
 from app.core.ratelimit import limiter
 from app.models.models import User

@@ -27,7 +27,7 @@ class AuthStateResponse(BaseModel):
 
 def _extract_token(request: Request) -> Optional[str]:
     """Extract JWT from Authorization header (preferred) or cookie fallback.
-    
+
     The frontend sends Bearer tokens via `Authorization` header for API calls
     and also receives the `ic_token` cookie for server-side middleware checks.
     The header takes precedence when both are present.

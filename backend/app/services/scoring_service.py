@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from app.models.models import Issue, Repository
 from app.services import ai_service
@@ -237,8 +237,6 @@ def score_live_issue(
 
     user_languages = {k.lower() for k in user_skills.get("languages", {}).keys()}
     user_topics = {t.lower() for t in user_skills.get("topics", [])}
-    user_top_skills = {s.lower() for s in user_skills.get("top_skills", [])}
-
     # ── 1. Language match (weight 0.40)
     repo_language = (raw_repo.get("language") or "").lower()
     repo_topics = {t.lower() for t in (raw_repo.get("topics") or [])}

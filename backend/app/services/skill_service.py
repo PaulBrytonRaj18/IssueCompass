@@ -274,7 +274,7 @@ async def skill_fingerprint_to_vector(fingerprint: Dict[str, Any]) -> List[float
         languages = fingerprint.get("languages", {})
         if languages:
             top_langs = sorted(languages.items(), key=lambda x: -x[1])[:5]
-            summary_parts.append("Languages: " + ", ".join(f"{l}({w})" for l, w in top_langs))
+            summary_parts.append("Languages: " + ", ".join(f"{lang}({w})" for lang, w in top_langs))
         top_skills = fingerprint.get("top_skills", [])
         if top_skills:
             summary_parts.append("Skills: " + ", ".join(top_skills[:10]))

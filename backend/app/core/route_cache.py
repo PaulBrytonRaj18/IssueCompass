@@ -19,9 +19,9 @@ Routes that should NOT be cached:
 
 import functools
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
-from app.core.cache import cache_get, cache_get_with_stale, cache_set
+from app.core.cache import cache_get, cache_set
 
 logger = logging.getLogger(__name__)
 

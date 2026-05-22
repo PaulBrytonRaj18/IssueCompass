@@ -145,7 +145,7 @@ async def reconcile() -> int:
         env={**os.environ, "SKIP_DB_RECONCILE": "true"},
     )
     if result.returncode != 0:
-        print(f"DB_RECONCILE: ERROR — alembic stamp head failed", file=sys.stderr)
+        print("DB_RECONCILE: ERROR — alembic stamp head failed", file=sys.stderr)
         return 1
 
     print("DB_RECONCILE: Successfully stamped alembic_version to head")

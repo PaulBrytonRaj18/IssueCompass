@@ -17,7 +17,6 @@ import json
 import logging
 import random
 import time
-from collections import defaultdict
 from typing import Any, Callable, Optional
 
 import redis.asyncio as aioredis
@@ -78,9 +77,9 @@ async def init_redis() -> None:
         await _redis.ping()
         _available = True
         logger.info("Redis connected: %s", settings.REDIS_URL)
-    except Exception as e:
+    except Exception:
         _available = False
-        logger.warning("Redis unavailable, caching disabled: %s", e)
+        logger.warning("Redis unavailable, caching disabled")
 
 
 async def close_redis() -> None:
@@ -92,8 +91,8 @@ async def close_redis() -> None:
                 await _redis.aclose()
             else:
                 await _redis.close()
-        except Exception as e:
-            logger.warning("Redis close error: %s", e)
+        except Exception:
+            logger.warning("Redis close error")
     _redis = None
     _available = False
     _in_flight.clear()
@@ -132,11 +131,11 @@ async def cache_get(key: str) -> Optional[Any]:
             return None
         _hits += 1
         return json.loads(data)
-    except (ConnectionError, TimeoutError) as e:
+    except (ConnectionError, TimeoutError):
         _misses += 1
         _record_latency(time.monotonic() - start)
         return None
-    except Exception as e:
+    except Exception:
         _misses += 1
         _record_latency(time.monotonic() - start)
         return None
@@ -180,7 +179,7 @@ async def cache_get_with_stale(
             if _should_early_expire(float(remaining), beta=min(ttl / 60, 5.0)):
                 _refresh_in_background(key, ttl, fetcher)
             return json.loads(data)
-    except Exception as e:
+    except Exception:
         _record_latency(time.monotonic() - start)
 
     global _misses
@@ -251,10 +250,10 @@ async def cache_set(key: str, value: Any, ttl: int = 3600) -> bool:
         await client.setex(_key(key), ttl, serialized)
         _record_latency(time.monotonic() - start)
         return True
-    except (ConnectionError, TimeoutError) as e:
+    except (ConnectionError, TimeoutError):
         _record_latency(time.monotonic() - start)
         return False
-    except Exception as e:
+    except Exception:
         _record_latency(time.monotonic() - start)
         return False
 
@@ -283,7 +282,7 @@ async def cache_delete_pattern(pattern: str) -> int:
         if deleted > 0:
             logger.info("Cache invalidated %d keys matching %s", deleted, pattern)
         return deleted
-    except Exception as e:
+    except Exception:
         return 0
 
 

@@ -8,21 +8,20 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get, cache_set
 from app.models.models import Issue, Repository, User
-from app.services import ai_service, scoring_service
 from app.services.scoring_service import (
     SCORE_WEIGHTS,
+    build_live_issue_explanation,
     compute_freshness_score,
     compute_interest_match,
     compute_popularity_score,
     compute_repo_activity_score,
     safe_explain_score,
     score_live_issue,
-    build_live_issue_explanation,
 )
 from app.services.skill_service import _stable_hash, issue_text_to_vector
 
@@ -96,8 +95,8 @@ def _convert_raw_issue_to_match_dict(
             "html_url": raw_issue.get("html_url", ""),
             "state": "open",
             "labels": labels,
-            "is_good_first_issue": "good first issue" in [l.lower() for l in labels],
-            "is_help_wanted": "help wanted" in [l.lower() for l in labels],
+            "is_good_first_issue": "good first issue" in [label.lower() for label in labels],
+            "is_help_wanted": "help wanted" in [label.lower() for label in labels],
             "required_skills": {},
             "complexity_score": 0.5,
             "comments": raw_issue.get("comments", 0),
@@ -205,7 +204,6 @@ async def _persist_high_score_issues(
                     db.add(repo_obj)
                     await db.flush()
 
-                issue_text = match["issue"]["title"] + "\n" + (match["issue"].get("body") or "")
                 vector = await issue_text_to_vector(
                     title=match["issue"]["title"],
                     body=match["issue"].get("body") or "",

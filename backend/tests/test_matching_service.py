@@ -1,7 +1,4 @@
-from datetime import datetime, timezone
-from unittest.mock import MagicMock
 
-from app.models.models import Issue
 from app.services import matching_service, scoring_service
 
 

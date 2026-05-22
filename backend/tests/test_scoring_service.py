@@ -257,7 +257,7 @@ class TestScoreLiveIssue:
         assert score_with > score_without
 
     def test_stale_issue_scores_lower_than_fresh(self):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         now = datetime.now(timezone.utc)
         old_date = (now - timedelta(days=200)).isoformat()
         fresh_date = (now - timedelta(days=1)).isoformat()

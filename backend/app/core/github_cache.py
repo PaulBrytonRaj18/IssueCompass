@@ -15,11 +15,10 @@ Cache TTLs are chosen based on data freshness requirements:
 """
 
 import hashlib
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.cache import cache_get, cache_get_with_stale, cache_set
+from app.core.cache import cache_get_with_stale
 
 logger = logging.getLogger(__name__)
 

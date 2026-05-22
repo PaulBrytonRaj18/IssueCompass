@@ -1,11 +1,9 @@
 """GitHub service tests — require network access to GitHub API."""
 import asyncio
-import pytest
 
+import pytest
 from app.services.github_service import (
     fetch_live_issues_for_user,
-    search_issues_free_text,
-    _gh_rate_remaining,
 )
 
 

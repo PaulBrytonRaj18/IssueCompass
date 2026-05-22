@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
+from arq import cron
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,8 +19,6 @@ from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.database import engine as db_engine
 from app.core.utils import parse_dt
-from arq import cron
-
 from app.services import github_service, skill_service
 
 logger = logging.getLogger("issuecompass.worker")
@@ -248,11 +247,11 @@ async def index_issues_task(ctx: dict) -> None:
     what our users actually care about. Falls back to a hardcoded base list
     if the DB query returns nothing (cold start).
     """
-    BASE_LANGUAGES = [
+    base_languages = [
         "python", "javascript", "typescript", "go", "rust",
         "java", "c++", "ruby", "php", "swift",
     ]
-    LABELS = ["good first issue", "help wanted"]
+    labels = ["good first issue", "help wanted"]
 
     db: AsyncSession = ctx["db"]
 
@@ -280,14 +279,14 @@ async def index_issues_task(ctx: dict) -> None:
         user_languages = []
 
     # Merge user languages with base list, user languages take priority
-    combined = list(dict.fromkeys(user_languages + BASE_LANGUAGES))
+    combined = list(dict.fromkeys(user_languages + base_languages))
     languages_to_index = combined[:12]
 
     logger.info("Indexing %d languages: %s", len(languages_to_index), languages_to_index)
 
     # ── Index each (language, label) pair ────────────────────────────────────
     for lang in languages_to_index:
-        for label in LABELS:
+        for label in labels:
             try:
                 await index_language_issues(ctx, lang, label)
             except Exception as exc:
