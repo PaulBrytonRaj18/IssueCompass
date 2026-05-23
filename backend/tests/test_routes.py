@@ -59,15 +59,14 @@ def client():
     async def override_get_db():
         yield mock_session
 
-    with patch("app.core.database.init_db", return_value=None):
-        from main import app
+    from main import app
 
-        app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = override_get_db
 
-        with TestClient(app) as c:
-            yield c
+    with TestClient(app) as c:
+        yield c
 
-        app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
 
 
 class TestHealthEndpoints:

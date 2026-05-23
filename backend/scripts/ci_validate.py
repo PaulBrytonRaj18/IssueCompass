@@ -56,10 +56,76 @@ def _fail(label: str, detail: str = "") -> None:
 # ── Checks ─────────────────────────────────────────────────────────────────
 
 
+async def check_network() -> int:
+    """Validate DNS resolution and TCP reachability for the database host."""
+    import socket
+    failed = 0
+    print("\n--- 0. Database Network Diagnostics ---")
+
+    db_url = os.environ.get("DATABASE_URL", "")
+    if not db_url:
+        _fail("network", "DATABASE_URL is not set")
+        return 1
+
+    # Parse hostname and port from URL
+    from urllib.parse import urlparse
+    parsed = urlparse(db_url.replace("+asyncpg", ""))
+    host = parsed.hostname or "unknown"
+    port = parsed.port or 5432
+
+    print(f"  Target: {_mask_db_url(db_url)}")
+    print(f"  Host:   {host}")
+    print(f"  Port:   {port}")
+
+    # DNS resolution
+    try:
+        addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        has_ipv4 = any(a[0] == socket.AF_INET for a in addrs)
+        has_ipv6 = any(a[0] == socket.AF_INET6 for a in addrs)
+        print(f"  DNS:    {len(addrs)} address(es) [IPv4={has_ipv4} IPv6={has_ipv6}]")
+        for a in addrs:
+            family = "IPv6" if a[0] == socket.AF_INET6 else "IPv4"
+            print(f"          {family}: {a[4][0]}")
+        if not has_ipv4:
+            print("  WARN:   No IPv4 A record — connection will fail on IPv4-only networks")
+    except socket.gaierror as e:
+        _fail("DNS resolution", f"cannot resolve {host}: {e}")
+        return 1
+
+    # TCP connectivity (via IPv4 fallback if available)
+    connected = False
+    for family, af_label in [(socket.AF_INET, "IPv4"), (socket.AF_INET6, "IPv6")]:
+        try:
+            family_addrs = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+        except socket.gaierror:
+            continue
+        for addr in family_addrs:
+            s = socket.socket(family, socket.SOCK_STREAM)
+            s.settimeout(5)
+            try:
+                s.connect(addr[4])
+                print(f"  TCP:    {af_label} connected to {addr[4]}")
+                connected = True
+                s.close()
+                break
+            except OSError as e:
+                print(f"  TCP:    {af_label} {addr[4][0]} — {e}")
+                s.close()
+        if connected:
+            break
+
+    if not connected:
+        _fail("TCP connectivity", "could not connect to database host on any address family")
+        return 1
+
+    _ok("network", f"DNS + TCP reachable — host={host} port={port}")
+    return failed
+
+
 async def check_async_engine() -> int:
     """Validate async engine creation and basic connectivity."""
     failed = 0
-    print("\n--- 0. Async Engine + PgBouncer Compatibility ---")
+    print("\n--- 1. Async Engine + PgBouncer Compatibility ---")
 
     from app.core.database import PGCONN_ARGS, AsyncSessionLocal, engine, get_pool_status
     from sqlalchemy import text
@@ -84,6 +150,18 @@ async def check_async_engine() -> int:
         _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
         failed += 1
 
+    # Verify NullPool is used (PgBouncer-compatible)
+    try:
+        poolclass_name = type(engine.pool).__name__
+        if poolclass_name != "NullPool":
+            _fail("Pool class", f"expected NullPool, got {poolclass_name}")
+            failed += 1
+        else:
+            _ok("Pool class", "NullPool — session pooler compatible")
+    except Exception as e:
+        _fail("Pool class", str(e))
+        failed += 1
+
     # Test SELECT 1
     try:
         async with engine.connect() as conn:
@@ -95,11 +173,12 @@ async def check_async_engine() -> int:
         _fail("connectivity", f"SELECT 1 failed: {e}")
         failed += 1
 
-    # Test pool introspection
+    # Test pool introspection — NullPool expected
     try:
         status = await get_pool_status()
         assert isinstance(status, dict), f"expected dict, got {type(status)}"
-        _ok("pool status", f"size={status.get('size', '?')}")
+        assert status.get("poolclass") == "NullPool", f"expected NullPool, got {status}"
+        _ok("pool status", "NullPool — no pooling")
     except Exception as e:
         _fail("pool status", str(e))
         failed += 1
@@ -121,7 +200,7 @@ async def check_async_engine() -> int:
 async def check_db_reconcile() -> int:
     """Validate db_reconcile script handles fresh DB gracefully."""
     failed = 0
-    print("\n--- 1. db_reconcile (fresh DB) ---")
+    print("\n--- 2. db_reconcile (fresh DB) ---")
 
     exit_code = os.system(f"{sys.executable} -m scripts.db_reconcile")
     if exit_code != 0:
@@ -136,7 +215,7 @@ async def check_db_reconcile() -> int:
 async def check_alembic() -> int:
     """Validate Alembic migrations run cleanly."""
     failed = 0
-    print("\n--- 2. Alembic Migrations ---")
+    print("\n--- 3. Alembic Migrations ---")
 
     import subprocess
 
@@ -182,7 +261,7 @@ async def check_alembic() -> int:
 async def check_schema() -> int:
     """Validate schema introspection finds expected tables."""
     failed = 0
-    print("\n--- 3. Schema Introspection ---")
+    print("\n--- 4. Schema Introspection ---")
 
     from app.core.database import engine
     from sqlalchemy import text
@@ -226,6 +305,7 @@ async def main() -> int:
     print(f"Database URL: {_mask_db_url(os.environ.get('DATABASE_URL', 'NOT SET'))}")
     print()
 
+    total += await check_network()
     total += await check_async_engine()
     total += await check_db_reconcile()
     total += await check_alembic()

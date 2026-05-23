@@ -34,6 +34,7 @@ async def startup(ctx):
 async def shutdown(ctx):
     logger.info("ARQ worker shutting down")
     await close_redis()
+    logger.info("DB: disposing engine (NullPool)")
     await db_engine.dispose()
 
 

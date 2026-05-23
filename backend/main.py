@@ -1,10 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-import asyncpg
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
-from app.core.database import close_db, get_pool_status, init_db
+from app.core.database import close_db, get_pool_status
 from app.core.monitoring import get_metrics, setup_monitoring
 from app.core.ratelimit import limiter
 from app.routes import auth, github, issues, maintainer, searches
@@ -27,11 +26,9 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     logger.info("IssueCompass API starting up...")
 
-    asyncpg_version = getattr(asyncpg, "__version__", "unknown")
     logger.info(
-        "DB: PgBouncer-safe config — asyncpg=%s "
-        "stmt_cache=0 prep_stmt_cache=0 pool_pre_ping=True pool_recycle=300s",
-        asyncpg_version,
+        "DB: using NullPool + stmt_cache=0 prep_stmt_cache=0 — "
+        "PgBouncer session pooler compatible"
     )
 
     config_errors = settings.check_errors()
@@ -43,16 +40,11 @@ async def lifespan(app: FastAPI):
         logger.info("CONFIG: all checks passed")
 
     try:
-        logger.info("DB: initializing connection pool and extensions...")
-        await init_db()
-        logger.info("DB: engine pool ready")
-    except Exception as e:
-        logger.error("DB: init failed — %s: %s", type(e).__name__, e)
-
-    try:
         await init_redis()
     except Exception as e:
         logger.warning("Redis: init failed — %s", e)
+
+    # Tables + extensions managed by Alembic migrations
 
     logger.info("IssueCompass API ready")
     yield

@@ -1,8 +1,8 @@
 """
-Database connection architecture.
+Database connection architecture — Supabase Session Pooler.
 
-PgBouncer Transaction Pooling Notes:
-  asyncpg uses prepared statements internally. PgBouncer transaction-mode
+PgBouncer Session Pooling Notes:
+  asyncpg uses prepared statements internally. PgBouncer session-mode
   pooling routes each transaction to a different backend connection, which
   causes prepared statement conflicts (InvalidSQLStatementNameError and
   DuplicatePreparedStatementError).
@@ -10,14 +10,18 @@ PgBouncer Transaction Pooling Notes:
   Fix: set BOTH statement_cache_size=0 AND prepared_statement_cache_size=0
   in connect_args.  asyncpg 0.29.0 deprecated the former in favour of the
   latter; setting both guarantees the cache is disabled across all versions.
+
+  poolclass=NullPool ensures every connection is short-lived, compatible
+  with PgBouncer session pooling.
 """
 
 import logging
+import socket
 
 import asyncpg
-from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 
@@ -31,7 +35,7 @@ if "+asyncpg" not in DATABASE_URL:
 # ── PgBouncer-safe connection arguments ────────────────────────────────
 # Both statement_cache_size and prepared_statement_cache_size are set to
 # 0 to cover both old (<0.28) and new (>=0.28) asyncpg parameter names.
-# Without this, PgBouncer transaction pooling causes:
+# Without this, PgBouncer session pooling causes:
 #   InvalidSQLStatementNameError — prepared stmt does not exist on backend
 #   DuplicatePreparedStatementError — same stmt name reused across backends
 PGCONN_ARGS: dict = {
@@ -39,18 +43,51 @@ PGCONN_ARGS: dict = {
     "statement_cache_size": 0,
     "prepared_statement_cache_size": 0,
     "command_timeout": 30,
+    "ssl": "require",
 }
+
+# ── DNS diagnostics at startup ───────────────────────────
+_db_host = (
+    settings.DATABASE_URL.split("@")[-1].split(":")[0]
+    if "@" in settings.DATABASE_URL else "unknown"
+)
+try:
+    _addrs = socket.getaddrinfo(
+        _db_host, 5432, socket.AF_UNSPEC, socket.SOCK_STREAM,
+    )
+    _has_ipv4 = any(a[0] == socket.AF_INET for a in _addrs)
+    _has_ipv6 = any(a[0] == socket.AF_INET6 for a in _addrs)
+    logger.info(
+        "DB_DNS: %s → %d address(es) [v4=%s v6=%s]",
+        _db_host, len(_addrs), _has_ipv4, _has_ipv6,
+    )
+    for a in _addrs:
+        family = "IPv6" if a[0] == socket.AF_INET6 else "IPv4"
+        logger.info("DB_DNS:   %s %s", family, a[4][0])
+    if not _has_ipv4:
+        logger.warning(
+            "DB_DNS: %s has no IPv4 A record — fails on IPv4-only networks",
+            _db_host,
+        )
+    if not _has_ipv6:
+        logger.warning(
+            "DB_DNS: %s has no IPv6 AAAA record — fails on IPv6-only networks",
+            _db_host,
+        )
+except Exception as _dns_err:
+    logger.warning("DB_DNS: could not resolve %s: %s", _db_host, _dns_err)
 
 # Log connection target with credentials masked
 def _mask_db_url(raw: str) -> str:
-    if "@" in raw:
-        return raw.split("@")[0].split("://")[0] + "://****@" + raw.split("@", 1)[1]
-    return raw
+    cleaned = raw.replace("+asyncpg", "")
+    if "@" in cleaned:
+        return cleaned.split("@")[0].split("://")[0] + "://****@" + cleaned.split("@", 1)[1]
+    return cleaned
+
 asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
     "DB_ENGINE: creating async engine — target=%s asyncpg=%s "
-    "pool=3/2 recycle=300s stmt_cache=0 prep_stmt_cache=0 "
-    "pre_ping=True LIFO=True isolation=READ_COMMITTED",
+    "poolclass=NullPool stmt_cache=0 prep_stmt_cache=0 pre_ping=True",
     _mask_db_url(settings.DATABASE_URL),
     asyncpg_version,
 )
@@ -58,31 +95,11 @@ logger.info(
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
+    poolclass=NullPool,
     pool_pre_ping=True,
-    pool_use_lifo=True,
-    pool_size=3,
-    max_overflow=2,
-    pool_recycle=300,
-    pool_timeout=5,
     connect_args=PGCONN_ARGS,
     isolation_level="READ_COMMITTED",
 )
-
-# ── Pool diagnostics logging ──────────────────────────────────────
-@event.listens_for(engine.sync_engine, "connect")
-def _on_db_connect(dbapi_connection, connection_record):
-    logger.debug("DB connection established")
-
-
-@event.listens_for(engine.sync_engine, "checkin")
-def _on_db_checkin(dbapi_connection, connection_record):
-    logger.debug("DB connection returned to pool")
-
-
-@event.listens_for(engine.sync_engine, "checkout")
-def _on_db_checkout(dbapi_connection, connection_record, connection_proxy):
-    logger.debug("DB connection checked out from pool")
-
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -106,62 +123,12 @@ async def get_db():
 
 
 async def close_db():
-    """Dispose of the application engine pool on shutdown.
-
-    Releases all pooled connections so the process exits cleanly and
-    PgBouncer can immediately reclaim the backend connections.
-    """
+    """Dispose of engine on shutdown — releases all connections to PgBouncer."""
     if engine is not None:
-        try:
-            pool = engine.pool
-            logger.info(
-                "DB_DISPOSE: closing pool — size=%d checked_in=%d checked_out=%d overflow=%d",
-                getattr(pool, "size", lambda: -1)(),
-                getattr(pool, "checkedin", lambda: -1)(),
-                getattr(pool, "checkedout", lambda: -1)(),
-                getattr(pool, "overflow", lambda: -1)(),
-            )
-        except Exception:
-            pass
+        logger.info("DB_DISPOSE: disposing engine (NullPool)")
         await engine.dispose()
-        logger.info("DB_DISPOSE: engine pool disposed")
 
 
 async def get_pool_status() -> dict:
-    """Return pool statistics for health / metrics endpoints."""
-    try:
-        pool = engine.pool
-        return {
-            "size": getattr(pool, "size", lambda: 0)(),
-            "checked_in": getattr(pool, "checkedin", lambda: 0)(),
-            "checked_out": getattr(pool, "checkedout", lambda: 0)(),
-            "overflow": getattr(pool, "overflow", lambda: 0)(),
-        }
-    except Exception:
-        return {"error": "pool not available"}
-
-
-async def init_db():
-    """Ensure DB extensions exist. Tables managed by Alembic migrations."""
-    from sqlalchemy.pool import NullPool
-
-    try:
-        _ddl_url = _mask_db_url(DATABASE_URL)
-        asyncpg_version = getattr(asyncpg, "__version__", "unknown")
-        logger.info(
-            "DB_INIT: creating short-lived engine — target=%s asyncpg=%s "
-            "NullPool stmt_cache=0 prep_stmt_cache=0",
-            _ddl_url,
-            asyncpg_version,
-        )
-        tmp_engine = create_async_engine(
-            DATABASE_URL,
-            poolclass=NullPool,
-            connect_args=PGCONN_ARGS,
-        )
-        async with tmp_engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await tmp_engine.dispose()
-        logger.info("DB_INIT: database extension verified")
-    except Exception as e:
-        logger.warning("DB_INIT: could not create vector extension (managed PG?): %s", e)
+    """Return pool status for health / metrics endpoints (NullPool = no pooling)."""
+    return {"poolclass": "NullPool", "status": "no-pool"}

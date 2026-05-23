@@ -30,7 +30,9 @@ async def reconcile() -> int:
         print("DB_RECONCILE: Skipped (SKIP_DB_RECONCILE is set)")
         return 0
 
-    db_url = os.environ.get("DATABASE_URL", "")
+    from app.core.config import get_settings
+
+    db_url = get_settings().DATABASE_URL
     if not db_url:
         print("DB_RECONCILE: No DATABASE_URL found, skipping")
         return 0
@@ -54,12 +56,12 @@ async def reconcile() -> int:
             "prepared_statement_cache_size": 0,
             "timeout": 10,
             "command_timeout": 30,
+            "ssl": "require",
         },
     )
     print(
-        "DB_RECONCILE: engine created — target=%s stmt_cache=0 prep_stmt_cache=0 "
-        "fail_fast=True",
-        _mask_db_url(db_url),
+        f"DB_RECONCILE: engine created — target={_mask_db_url(db_url)} "
+        "stmt_cache=0 prep_stmt_cache=0 fail_fast=True"
     )
     try:
         async with engine.connect() as conn:
@@ -145,9 +147,10 @@ async def reconcile() -> int:
 
 def _mask_db_url(raw: str) -> str:
     """Mask credentials in a database URL for safe logging."""
-    if "@" in raw:
-        return raw.split("@")[0].split("://")[0] + "://****@" + raw.split("@", 1)[1]
-    return raw
+    cleaned = raw.replace("+asyncpg", "")
+    if "@" in cleaned:
+        return cleaned.split("@")[0].split("://")[0] + "://****@" + cleaned.split("@", 1)[1]
+    return cleaned
 
 
 def main():

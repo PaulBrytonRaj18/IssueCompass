@@ -1,28 +1,33 @@
-import asyncio
+"""
+Alembic environment — synchronous psycopg2 engine for migration stability.
+
+WHY SYNC:
+  asyncpg (used by the FastAPI runtime) has prepared-statement caching that
+  conflicts with PgBouncer session pooling, causing
+  DuplicatePreparedStatementError.  While we can disable the cache with
+  statement_cache_size=0, Alembic's async support adds unnecessary
+  complexity.  A synchronous psycopg2 engine avoids these issues entirely
+  and is the recommended approach for Alembic with PgBouncer.
+"""
+
 import os
 from logging.config import fileConfig
 
 from alembic import context
 from app.core.database import Base
 from app.models.models import *  # noqa: F401, F403
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy import create_engine, pool
 
 config = context.config
 
 # ── Load database URL from environment ─────────────────────────
-# Never rely on ConfigParser %(...)s interpolation in alembic.ini;
-# Python's ConfigParser treats that as option references, not env vars.
 _database_url = os.environ.get("DATABASE_URL", "")
 if not _database_url:
     from app.core.config import get_settings
-
     _database_url = get_settings().DATABASE_URL
 
-_migration_url = _database_url
-if "+asyncpg" not in _database_url:
-    _database_url = _database_url.replace("postgresql://", "postgresql+asyncpg://")
-    _migration_url = _database_url
+# Strip async driver prefix — Alembic uses sync psycopg2 engine
+_migration_url = _database_url.replace("+asyncpg", "")
 
 config.set_main_option("sqlalchemy.url", _migration_url)
 
@@ -45,37 +50,19 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations():
-    config_section = dict(config.get_section(config.config_ini_section))
-    config_section["sqlalchemy.url"] = _migration_url
-    # statement_cache_size=0 is REQUIRED when connecting via PgBouncer
-    # transaction pooling. Without it, asyncpg prepared statements
-    # conflict because PgBouncer routes subsequent queries to different
-    # backend connections, causing DuplicatePreparedStatementError.
-    connectable = async_engine_from_config(
-        config_section,
-        prefix="sqlalchemy.",
+def run_migrations_online():
+    connectable = create_engine(
+        _migration_url,
         poolclass=pool.NullPool,
         connect_args={
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-            "timeout": 10,
-            "command_timeout": 60,
+            "connect_timeout": 10,
+            "sslmode": "require",
         },
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
-def run_migrations_online():
-    asyncio.run(run_async_migrations())
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
