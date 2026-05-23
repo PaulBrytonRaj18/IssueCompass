@@ -53,7 +53,6 @@ async def reconcile() -> int:
         poolclass=NullPool,
         connect_args={
             "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
             "timeout": 10,
             "command_timeout": 30,
             "ssl": "require",
@@ -61,7 +60,7 @@ async def reconcile() -> int:
     )
     print(
         f"DB_RECONCILE: engine created — target={_mask_db_url(db_url)} "
-        "stmt_cache=0 prep_stmt_cache=0 fail_fast=True"
+        "stmt_cache=0 fail_fast=True"
     )
     try:
         async with engine.connect() as conn:

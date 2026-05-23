@@ -8,9 +8,6 @@
 
 name: CI
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   push:
     branches: [main, develop]
@@ -208,33 +205,16 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 1/7 — DNS Resolution Validation
-        run: |
-          HOST=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').hostname)")
-          echo "Host: $HOST"
-          addrs=$(python3 -c "import socket;addrs=socket.getaddrinfo('$HOST',5432,socket.AF_UNSPEC,socket.SOCK_STREAM);[print(f'  {\"IPv6\"if a[0]==socket.AF_INET6 else\"IPv4\"}: {a[4][0]}') for a in addrs];has_v4=any(a[0]==socket.AF_INET for a in addrs);print(f'DNS: {len(addrs)} addr [v4={has_v4}]');exit(0 if has_v4 else 1)")
-          echo "DNS resolution: PASSED"
+        run: python -m scripts.ci_db_check dns
 
       - name: 2/7 — Network Reachability Validation
-        run: |
-          HOST=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').hostname)")
-          PORT=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').port or 5432)")
-          timeout 5 bash -c "echo > /dev/tcp/$HOST/$PORT" 2>&1 && echo "TCP: connected to $HOST:$PORT" || { echo "TCP: FAILED"; exit 1; }
-          echo "TCP reachability: PASSED"
+        run: python -m scripts.ci_db_check tcp
 
       - name: 3/7 — PostgreSQL Authentication Validation
-        run: |
-          python3 -c "import asyncio,asyncpg,os;asyncio.run(asyncpg.connect(os.environ['DATABASE_URL'],statement_cache_size=0,prepared_statement_cache_size=0,timeout=10)).then(lambda c:c.fetchval('SELECT version()').then(lambda v:(print(f'Connected: {v}'),c.close())))" 2>&1 || python3 -c "
-          import asyncio,asyncpg,os
-          async def test():
-              conn=await asyncpg.connect(os.environ['DATABASE_URL'],statement_cache_size=0,prepared_statement_cache_size=0,timeout=10)
-              v=await conn.fetchval('SELECT version()')
-              print(f'Connected: {v}')
-              await conn.close()
-          asyncio.run(test())" && echo "Authentication: PASSED"
+        run: python -m scripts.ci_db_check auth
 
       - name: 4/7 — PgBouncer Compatibility Validation
-        run: |
-          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';from app.core.database import PGCONN_ARGS,engine;assert PGCONN_ARGS['statement_cache_size']==0;assert PGCONN_ARGS['prepared_statement_cache_size']==0;from sqlalchemy.pool import NullPool;assert isinstance(engine.pool,NullPool);print('statement_cache_size=0: OK');print('prepared_statement_cache_size=0: OK');print('poolclass=NullPool: OK');print('PgBouncer compat: PASSED')"
+        run: python -m scripts.ci_db_check pgbouncer
 
       - name: 5/7 — Migration Validation (alembic current + upgrade head)
         run: |
@@ -244,29 +224,10 @@ jobs:
           echo "Migrations: PASSED"
 
       - name: 6/7 — Schema Validation
-        run: |
-          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';import asyncio;from app.core.database import engine;from sqlalchemy import text
-          async def check():
-              async with engine.connect() as conn:
-                  r=await conn.execute(text(\"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name\"))
-                  tables=[row[0] for row in r]
-                  expected={'users','repositories','issues','saved_searches','alembic_version','saved_issues'}
-                  missing=expected-set(tables)
-                  if missing:print(f'MISSING: {missing}');sys.exit(1)
-                  print(f'Tables ({len(tables)}): {tables}')
-                  print('All expected tables present')
-          asyncio.run(check());print('Schema validation: PASSED')"
+        run: python -m scripts.ci_db_check schema
 
       - name: 7/7 — Runtime DB Validation (asyncpg connectivity)
-        run: |
-          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';import asyncio;from app.core.database import engine,AsyncSessionLocal;from sqlalchemy import text
-          async def test():
-              async with engine.connect() as conn:
-                  r=await conn.execute(text('SELECT 1'));assert r.scalar()==1;print('engine.connect SELECT 1: OK')
-              async with AsyncSessionLocal() as s:
-                  r=await s.execute(text('SELECT 1 AS a'));assert r.scalar()==1;print('session SELECT 1: OK')
-              print('Runtime DB: PASSED')
-          asyncio.run(test())"
+        run: python -m scripts.ci_db_check runtime
 
   # ────────────────────────────────────────────────────────────
   # STARTUP VALIDATION: Boot FastAPI, hit /health

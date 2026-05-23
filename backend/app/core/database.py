@@ -7,12 +7,12 @@ PgBouncer Session Pooling Notes:
   causes prepared statement conflicts (InvalidSQLStatementNameError and
   DuplicatePreparedStatementError).
 
-  Fix: set BOTH statement_cache_size=0 AND prepared_statement_cache_size=0
-  in connect_args.  asyncpg 0.29.0 deprecated the former in favour of the
-  latter; setting both guarantees the cache is disabled across all versions.
+  Fix: set statement_cache_size=0 in connect_args to disable asyncpg's
+  prepared statement cache.  Pooling (QueuePool) cannot be used with
+  PgBouncer session pooling; poolclass=NullPool is mandatory.
 
-  poolclass=NullPool ensures every connection is short-lived, compatible
-  with PgBouncer session pooling.
+  NOTE: "prepared_statement_cache_size" is NOT a valid asyncpg.connect()
+  parameter in any version up to 0.29.x.  Only statement_cache_size exists.
 """
 
 import logging
@@ -33,15 +33,17 @@ if "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 # ── PgBouncer-safe connection arguments ────────────────────────────────
-# Both statement_cache_size and prepared_statement_cache_size are set to
-# 0 to cover both old (<0.28) and new (>=0.28) asyncpg parameter names.
-# Without this, PgBouncer session pooling causes:
+# statement_cache_size=0 disables asyncpg's prepared statement cache.
+# Without this, PgBouncer session pooling routes queries to different
+# backend connections, causing:
 #   InvalidSQLStatementNameError — prepared stmt does not exist on backend
 #   DuplicatePreparedStatementError — same stmt name reused across backends
+#
+# IMPORTANT: "prepared_statement_cache_size" is NOT a valid asyncpg
+# parameter anywhere in the 0.x line.  Only statement_cache_size exists.
 PGCONN_ARGS: dict = {
     "timeout": 10,
     "statement_cache_size": 0,
-    "prepared_statement_cache_size": 0,
     "command_timeout": 30,
     "ssl": "require",
 }
@@ -87,7 +89,7 @@ def _mask_db_url(raw: str) -> str:
 asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
     "DB_ENGINE: creating async engine — target=%s asyncpg=%s "
-    "poolclass=NullPool stmt_cache=0 prep_stmt_cache=0 pre_ping=True",
+    "poolclass=NullPool stmt_cache=0 pre_ping=True",
     _mask_db_url(settings.DATABASE_URL),
     asyncpg_version,
 )

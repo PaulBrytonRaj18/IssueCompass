@@ -141,11 +141,11 @@ async def check_async_engine() -> int:
         if PGCONN_ARGS.get("statement_cache_size") != 0:
             _fail("PgBouncer", "statement_cache_size is not 0")
             failed += 1
-        elif PGCONN_ARGS.get("prepared_statement_cache_size") != 0:
-            _fail("PgBouncer", "prepared_statement_cache_size is not 0")
+        elif "prepared_statement_cache_size" in PGCONN_ARGS:
+            _fail("PgBouncer", "prepared_statement_cache_size present but asyncpg does not accept this param")
             failed += 1
         else:
-            _ok("PgBouncer", "statement_cache_size=0 and prepared_statement_cache_size=0")
+            _ok("PgBouncer", "statement_cache_size=0 (prepared_statement_cache_size is not a valid asyncpg param)")
     except Exception as e:
         _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
         failed += 1
