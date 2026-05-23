@@ -61,8 +61,8 @@ async def check_async_engine() -> int:
     failed = 0
     print("\n--- 1. Async Engine + PgBouncer Compatibility ---")
 
-    from sqlalchemy import text
     from app.core.database import AsyncSessionLocal, engine, get_pool_status
+    from sqlalchemy import text
 
     # Verify engine exists
     if engine is None:
@@ -183,8 +183,8 @@ async def check_schema() -> int:
     failed = 0
     print("\n--- 4. Schema Introspection ---")
 
-    from sqlalchemy import text
     from app.core.database import engine
+    from sqlalchemy import text
 
     try:
         async with engine.connect() as conn:

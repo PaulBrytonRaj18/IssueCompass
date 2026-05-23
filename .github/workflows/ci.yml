@@ -177,7 +177,7 @@ jobs:
           POSTGRES_PASSWORD: issuecompass
           POSTGRES_DB: issuecompass
         options: >-
-          --health-cmd pg_isready -U issuecompass
+          --health-cmd "pg_isready -U issuecompass"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -226,7 +226,7 @@ jobs:
           POSTGRES_PASSWORD: issuecompass
           POSTGRES_DB: issuecompass
         options: >-
-          --health-cmd pg_isready -U issuecompass
+          --health-cmd "pg_isready -U issuecompass"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -330,7 +330,7 @@ jobs:
           POSTGRES_PASSWORD: issuecompass
           POSTGRES_DB: issuecompass
         options: >-
-          --health-cmd pg_isready -U issuecompass
+          --health-cmd "pg_isready -U issuecompass"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
