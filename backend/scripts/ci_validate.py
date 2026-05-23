@@ -59,7 +59,7 @@ def _fail(label: str, detail: str = "") -> None:
 async def check_async_engine() -> int:
     """Validate async engine creation and basic connectivity."""
     failed = 0
-    print("\n--- 1. Async Engine + PgBouncer Compatibility ---")
+    print("\n--- 0. Async Engine + PgBouncer Compatibility ---")
 
     from app.core.database import PGCONN_ARGS, AsyncSessionLocal, engine, get_pool_status
     from sqlalchemy import text
@@ -121,7 +121,7 @@ async def check_async_engine() -> int:
 async def check_db_reconcile() -> int:
     """Validate db_reconcile script handles fresh DB gracefully."""
     failed = 0
-    print("\n--- 2. db_reconcile (fresh DB) ---")
+    print("\n--- 1. db_reconcile (fresh DB) ---")
 
     exit_code = os.system(f"{sys.executable} -m scripts.db_reconcile")
     if exit_code != 0:
@@ -136,7 +136,7 @@ async def check_db_reconcile() -> int:
 async def check_alembic() -> int:
     """Validate Alembic migrations run cleanly."""
     failed = 0
-    print("\n--- 3. Alembic Migrations ---")
+    print("\n--- 2. Alembic Migrations ---")
 
     import subprocess
 
@@ -182,7 +182,7 @@ async def check_alembic() -> int:
 async def check_schema() -> int:
     """Validate schema introspection finds expected tables."""
     failed = 0
-    print("\n--- 4. Schema Introspection ---")
+    print("\n--- 3. Schema Introspection ---")
 
     from app.core.database import engine
     from sqlalchemy import text

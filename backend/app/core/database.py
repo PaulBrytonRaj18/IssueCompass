@@ -142,45 +142,26 @@ async def get_pool_status() -> dict:
 
 
 async def init_db():
-    """Ensure DB extensions exist. Tables managed by Alembic migrations.
-
-    Uses a short-lived engine with NullPool so the startup connection does
-    NOT pollute the application pool's prepared-statement state.  This
-    avoids the risk of a ``CREATE EXTENSION`` prepared statement lingering
-    across PgBouncer backend switches.
-
-    All connections from this function set statement_cache_size=0 and
-    prepared_statement_cache_size=0 so that asyncpg does NOT cache prepared
-    statements across PgBouncer backend connections.  Without this,
-    PgBouncer transaction pooling causes:
-      - InvalidSQLStatementNameError
-      - DuplicatePreparedStatementError
-    """
+    """Ensure DB extensions exist. Tables managed by Alembic migrations."""
     from sqlalchemy.pool import NullPool
 
     try:
+        _ddl_url = _mask_db_url(DATABASE_URL)
         asyncpg_version = getattr(asyncpg, "__version__", "unknown")
         logger.info(
-            "DB_INIT: creating short-lived engine — asyncpg=%s "
+            "DB_INIT: creating short-lived engine — target=%s asyncpg=%s "
             "NullPool stmt_cache=0 prep_stmt_cache=0",
+            _ddl_url,
             asyncpg_version,
         )
         tmp_engine = create_async_engine(
             DATABASE_URL,
             poolclass=NullPool,
-            connect_args={
-                "timeout": 10,
-                "statement_cache_size": 0,
-                "prepared_statement_cache_size": 0,
-                "command_timeout": 30,
-            },
+            connect_args=PGCONN_ARGS,
         )
         async with tmp_engine.begin() as conn:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await tmp_engine.dispose()
-        logger.info(
-            "DB_INIT: database extension verified — "
-            "PgBouncer-safe config active (stmt_cache=0)",
-        )
+        logger.info("DB_INIT: database extension verified")
     except Exception as e:
         logger.warning("DB_INIT: could not create vector extension (managed PG?): %s", e)

@@ -12,20 +12,11 @@ Background:
   try to recreate them because it has no record of the current schema state.
   This causes "relation already exists" errors during deployment.
 
-PgBouncer Compatibility:
-  This script sets statement_cache_size=0 AND prepared_statement_cache_size=0
-  on every engine to prevent DuplicatePreparedStatementError when connecting
-  through PgBouncer transaction/statement pooling.
-
-  Retries are intentionally NOT used. Configuration errors (like missing
-  statement_cache_size=0) must fail immediately so deployment pipelines
-  catch the root cause, not mask it behind exponential backoff.
-
 Usage:
   python -m scripts.db_reconcile
 
 Environment:
-  DATABASE_URL or DATABASE_URL_DIRECT — database connection string
+  DATABASE_URL — database connection string
   SKIP_DB_RECONCILE — set to "true" to skip reconciliation (for local dev)
 """
 
@@ -39,7 +30,7 @@ async def reconcile() -> int:
         print("DB_RECONCILE: Skipped (SKIP_DB_RECONCILE is set)")
         return 0
 
-    db_url = os.environ.get("DATABASE_URL_DIRECT") or os.environ.get("DATABASE_URL", "")
+    db_url = os.environ.get("DATABASE_URL", "")
     if not db_url:
         print("DB_RECONCILE: No DATABASE_URL found, skipping")
         return 0

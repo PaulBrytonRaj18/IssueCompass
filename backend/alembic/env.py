@@ -13,15 +13,12 @@ config = context.config
 # ── Load database URL from environment ─────────────────────────
 # Never rely on ConfigParser %(...)s interpolation in alembic.ini;
 # Python's ConfigParser treats that as option references, not env vars.
-_database_url = os.environ.get("DATABASE_URL_DIRECT") or os.environ.get("DATABASE_URL", "")
+_database_url = os.environ.get("DATABASE_URL", "")
 if not _database_url:
     from app.core.config import get_settings
 
     _database_url = get_settings().DATABASE_URL
 
-# DATABASE_URL_DIRECT bypasses PgBouncer for migration safety.
-# When using PgBouncer transaction pooling, asyncpg prepared statements
-# conflict because the backend connection changes between transactions.
 _migration_url = _database_url
 if "+asyncpg" not in _database_url:
     _database_url = _database_url.replace("postgresql://", "postgresql+asyncpg://")

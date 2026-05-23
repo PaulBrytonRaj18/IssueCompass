@@ -201,7 +201,6 @@ jobs:
       - name: Run CI validation suite
         env:
           DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
-          DATABASE_URL_DIRECT: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
           OAUTH_GITHUB_CLIENT_ID: ci-placeholder
@@ -259,7 +258,6 @@ jobs:
       - name: Apply Alembic migrations
         env:
           DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
-          DATABASE_URL_DIRECT: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
         run: alembic upgrade head 2>&1
 
       - name: Start FastAPI server
