@@ -14,6 +14,10 @@ export function useSyncUserToBackend() {
         setAuthToken(data.access_token);
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.github.all });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issues.matches(),
+      });
     },
     retry: 1,
   });

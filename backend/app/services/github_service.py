@@ -67,6 +67,13 @@ async def _gh_request(method: str, url: str, **kwargs) -> httpx.Response:
         if _gh_rate_remaining < 100:
             logger.warning("GitHub rate limit low: %d remaining", _gh_rate_remaining)
 
+    if resp.status_code in (401, 403):
+        logger.error(
+            "GitHub API auth error: %d on %s. Check GITHUB_TOKEN validity.",
+            resp.status_code,
+            url,
+        )
+
     return resp
 
 # Cache key prefixes

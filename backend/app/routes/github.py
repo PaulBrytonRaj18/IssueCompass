@@ -27,8 +27,11 @@ async def analyze_github_profile(
     This is the core skill-building endpoint. Rate-limited to 5/min.
     """
     repos = await github_service.fetch_user_repos(username)
-    if not repos and not current_user:
-        raise HTTPException(status_code=404, detail="GitHub user not found or no repos")
+    if not repos:
+        raise HTTPException(
+            status_code=404,
+            detail="GitHub user not found or no repos. Check that GITHUB_TOKEN is valid.",
+        )
 
     fingerprint = await skill_service.build_skill_fingerprint(repos)
 
