@@ -209,156 +209,64 @@ jobs:
 
       - name: 1/7 — DNS Resolution Validation
         run: |
-          echo "=== DNS resolution for database host ==="
-          HOST=$(python3 -c "from urllib.parse import urlparse; u=urlparse('$DATABASE_URL'); print(u.hostname)")
+          HOST=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').hostname)")
           echo "Host: $HOST"
-          nslookup "$HOST" 2>&1 || echo "nslookup unavailable, trying dig..."
-          dig "$HOST" A +short 2>&1 || echo "dig unavailable"
-          dig "$HOST" AAAA +short 2>&1 || echo "dig AAAA unavailable"
-          python3 -c "
-import socket
-addrs = socket.getaddrinfo('$HOST', 5432, socket.AF_UNSPEC, socket.SOCK_STREAM)
-has_v4 = any(a[0] == socket.AF_INET for a in addrs)
-has_v6 = any(a[0] == socket.AF_INET6 for a in addrs)
-print(f'Addresses: {len(addrs)} [v4={has_v4} v6={has_v6}]')
-for a in addrs:
-    af = 'IPv6' if a[0] == socket.AF_INET6 else 'IPv4'
-    print(f'  {af}: {a[4][0]}')
-assert has_v4, 'No IPv4 address found — required for IPv4 networks'
-print('DNS resolution: PASSED')
-"
+          addrs=$(python3 -c "import socket;addrs=socket.getaddrinfo('$HOST',5432,socket.AF_UNSPEC,socket.SOCK_STREAM);[print(f'  {\"IPv6\"if a[0]==socket.AF_INET6 else\"IPv4\"}: {a[4][0]}') for a in addrs];has_v4=any(a[0]==socket.AF_INET for a in addrs);print(f'DNS: {len(addrs)} addr [v4={has_v4}]');exit(0 if has_v4 else 1)")
+          echo "DNS resolution: PASSED"
 
       - name: 2/7 — Network Reachability Validation
         run: |
-          echo "=== TCP connectivity to database ==="
-          HOST=$(python3 -c "from urllib.parse import urlparse; u=urlparse('$DATABASE_URL'); print(u.hostname)")
-          PORT=$(python3 -c "from urllib.parse import urlparse; u=urlparse('$DATABASE_URL'); print(u.port or 5432)")
-          python3 -c "
-import socket
-for family, label in [(socket.AF_INET, 'IPv4'), (socket.AF_INET6, 'IPv6')]:
-    try:
-        addrs = socket.getaddrinfo('$HOST', $PORT, family, socket.SOCK_STREAM)
-        for addr in addrs:
-            s = socket.socket(family, socket.SOCK_STREAM)
-            s.settimeout(5)
-            try:
-                s.connect(addr[4])
-                print(f'{label}: connected to {addr[4]}')
-                s.close()
-                break
-            except OSError as e:
-                print(f'{label}: {e}')
-                s.close()
-    except socket.gaierror:
-        print(f'{label}: no addresses')
-print('TCP reachability: PASSED')
-"
+          HOST=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').hostname)")
+          PORT=$(python3 -c "from urllib.parse import urlparse;print(urlparse('$DATABASE_URL').port or 5432)")
+          timeout 5 bash -c "echo > /dev/tcp/$HOST/$PORT" 2>&1 && echo "TCP: connected to $HOST:$PORT" || { echo "TCP: FAILED"; exit 1; }
+          echo "TCP reachability: PASSED"
 
       - name: 3/7 — PostgreSQL Authentication Validation
         run: |
-          echo "=== PostgreSQL authentication ==="
-          python3 -c "
-import asyncio, asyncpg
-async def test():
-    conn = await asyncpg.connect(
-        '$DATABASE_URL',
-        statement_cache_size=0,
-        prepared_statement_cache_size=0,
-        timeout=10,
-    )
-    ver = await conn.fetchval('SELECT version()')
-    print(f'Connected: {ver}')
-    await conn.close()
-asyncio.run(test())
-print('Authentication: PASSED')
-"
+          python3 -c "import asyncio,asyncpg,os;asyncio.run(asyncpg.connect(os.environ['DATABASE_URL'],statement_cache_size=0,prepared_statement_cache_size=0,timeout=10)).then(lambda c:c.fetchval('SELECT version()').then(lambda v:(print(f'Connected: {v}'),c.close())))" 2>&1 || python3 -c "
+          import asyncio,asyncpg,os
+          async def test():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'],statement_cache_size=0,prepared_statement_cache_size=0,timeout=10)
+              v=await conn.fetchval('SELECT version()')
+              print(f'Connected: {v}')
+              await conn.close()
+          asyncio.run(test())" && echo "Authentication: PASSED"
 
       - name: 4/7 — PgBouncer Compatibility Validation
         run: |
-          echo "=== PgBouncer compatibility checks ==="
-          python3 -c "
-import os, sys
-sys.path.insert(0, '.')
-os.environ['DATABASE_URL'] = '$DATABASE_URL'
-from app.core.database import PGCONN_ARGS, engine
-# Check prepared statement cache settings
-assert PGCONN_ARGS.get('statement_cache_size') == 0, 'statement_cache_size not 0'
-assert PGCONN_ARGS.get('prepared_statement_cache_size') == 0, 'prepared_statement_cache_size not 0'
-print(f'statement_cache_size=0: OK')
-print(f'prepared_statement_cache_size=0: OK')
-# Check poolclass
-from sqlalchemy.pool import NullPool
-pool = engine.pool
-assert isinstance(pool, NullPool), f'Expected NullPool, got {type(pool).__name__}'
-print(f'poolclass=NullPool: OK')
-# Check pool_pre_ping
-print(f'pool_pre_ping=True: OK')
-print('PgBouncer compat: PASSED')
-"
+          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';from app.core.database import PGCONN_ARGS,engine;assert PGCONN_ARGS['statement_cache_size']==0;assert PGCONN_ARGS['prepared_statement_cache_size']==0;from sqlalchemy.pool import NullPool;assert isinstance(engine.pool,NullPool);print('statement_cache_size=0: OK');print('prepared_statement_cache_size=0: OK');print('poolclass=NullPool: OK');print('PgBouncer compat: PASSED')"
 
       - name: 5/7 — Migration Validation (alembic current + upgrade head)
         run: |
-          echo "=== Alembic migration state ==="
           alembic current 2>&1
-          echo ""
-          echo "=== Running migrations ==="
           alembic upgrade head 2>&1
-          echo ""
-          echo "=== Post-migration state ==="
           alembic current 2>&1
           echo "Migrations: PASSED"
 
       - name: 6/7 — Schema Validation
         run: |
-          echo "=== Schema introspection ==="
-          python3 -c "
-import os, sys
-sys.path.insert(0, '.')
-os.environ['DATABASE_URL'] = '$DATABASE_URL'
-import asyncio
-from app.core.database import engine
-from sqlalchemy import text
-async def check():
-    async with engine.connect() as conn:
-        r = await conn.execute(text(
-            \"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name\"
-        ))
-        tables = [row[0] for row in r]
-        print(f'Tables: {tables}')
-        expected = {'users', 'repositories', 'issues', 'saved_searches', 'alembic_version', 'saved_issues'}
-        missing = expected - set(tables)
-        if missing:
-            print(f'MISSING: {missing}')
-            sys.exit(1)
-        print(f'All {len(expected)} expected tables present')
-asyncio.run(check())
-print('Schema validation: PASSED')
-"
+          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';import asyncio;from app.core.database import engine;from sqlalchemy import text
+          async def check():
+              async with engine.connect() as conn:
+                  r=await conn.execute(text(\"SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name\"))
+                  tables=[row[0] for row in r]
+                  expected={'users','repositories','issues','saved_searches','alembic_version','saved_issues'}
+                  missing=expected-set(tables)
+                  if missing:print(f'MISSING: {missing}');sys.exit(1)
+                  print(f'Tables ({len(tables)}): {tables}')
+                  print('All expected tables present')
+          asyncio.run(check());print('Schema validation: PASSED')"
 
       - name: 7/7 — Runtime DB Validation (asyncpg connectivity)
         run: |
-          echo "=== Runtime asyncpg connectivity ==="
-          python3 -c "
-import os, sys
-sys.path.insert(0, '.')
-os.environ['DATABASE_URL'] = '$DATABASE_URL'
-import asyncio
-from app.core.database import engine, AsyncSessionLocal
-from sqlalchemy import text
-async def test():
-    # Test via engine
-    async with engine.connect() as conn:
-        r = await conn.execute(text('SELECT 1'))
-        assert r.scalar() == 1
-        print('engine.connect SELECT 1: OK')
-    # Test via session
-    async with AsyncSessionLocal() as session:
-        r = await session.execute(text('SELECT 1 AS a'))
-        assert r.scalar() == 1
-        print('session SELECT 1: OK')
-    print('Runtime DB: PASSED')
-asyncio.run(test())
-"
+          python3 -c "import os,sys;sys.path.insert(0,'.');os.environ['DATABASE_URL']='$DATABASE_URL';import asyncio;from app.core.database import engine,AsyncSessionLocal;from sqlalchemy import text
+          async def test():
+              async with engine.connect() as conn:
+                  r=await conn.execute(text('SELECT 1'));assert r.scalar()==1;print('engine.connect SELECT 1: OK')
+              async with AsyncSessionLocal() as s:
+                  r=await s.execute(text('SELECT 1 AS a'));assert r.scalar()==1;print('session SELECT 1: OK')
+              print('Runtime DB: PASSED')
+          asyncio.run(test())"
 
   # ────────────────────────────────────────────────────────────
   # STARTUP VALIDATION: Boot FastAPI, hit /health
