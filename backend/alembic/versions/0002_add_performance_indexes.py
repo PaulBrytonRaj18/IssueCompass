@@ -7,6 +7,7 @@ Create Date: 2026-05-19
 """
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0002"
@@ -23,7 +24,7 @@ def upgrade() -> None:
     op.create_index("ix_issues_updated_at", "issues", ["updated_at"])
 
     # Issues: composite for matching queries (state + skill_vector)
-    op.create_index("ix_issues_state_vector", "issues", ["state"], postgresql_where=op.text("skill_vector IS NOT NULL"))
+    op.create_index("ix_issues_state_vector", "issues", ["state"], postgresql_where=sa.text("skill_vector IS NOT NULL"))
 
     # Repositories: index for language filters
     op.create_index("ix_repositories_language", "repositories", ["primary_language"])

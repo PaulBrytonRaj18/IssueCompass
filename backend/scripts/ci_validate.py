@@ -61,7 +61,7 @@ async def check_async_engine() -> int:
     failed = 0
     print("\n--- 1. Async Engine + PgBouncer Compatibility ---")
 
-    from app.core.database import AsyncSessionLocal, engine, get_pool_status
+    from app.core.database import PGCONN_ARGS, AsyncSessionLocal, engine, get_pool_status
     from sqlalchemy import text
 
     # Verify engine exists
@@ -70,17 +70,18 @@ async def check_async_engine() -> int:
         return 1
     _ok("engine", f"engine created, target={_mask_db_url(str(engine.url))}")
 
-    # Verify connect_args contain PgBouncer-safe settings
+    # Verify PgBouncer-safe connect_args from the engine's configuration
     try:
-        sync_engine = getattr(engine, "sync_engine", None)
-        connect_args = getattr(sync_engine, "connect_args", {}) if sync_engine else {}
-        if connect_args.get("statement_cache_size") != 0:
+        if PGCONN_ARGS.get("statement_cache_size") != 0:
             _fail("PgBouncer", "statement_cache_size is not 0")
             failed += 1
+        elif PGCONN_ARGS.get("prepared_statement_cache_size") != 0:
+            _fail("PgBouncer", "prepared_statement_cache_size is not 0")
+            failed += 1
         else:
-            _ok("PgBouncer", "statement_cache_size=0")
+            _ok("PgBouncer", "statement_cache_size=0 and prepared_statement_cache_size=0")
     except Exception as e:
-        _fail("PgBouncer", f"could not inspect connect_args: {e}")
+        _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
         failed += 1
 
     # Test SELECT 1

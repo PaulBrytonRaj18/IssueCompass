@@ -28,12 +28,19 @@ DATABASE_URL = settings.DATABASE_URL
 if "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-# ── PgBouncer-safe async engine ─────────────────────────────────────────
+# ── PgBouncer-safe connection arguments ────────────────────────────────
 # Both statement_cache_size and prepared_statement_cache_size are set to
 # 0 to cover both old (<0.28) and new (>=0.28) asyncpg parameter names.
 # Without this, PgBouncer transaction pooling causes:
 #   InvalidSQLStatementNameError — prepared stmt does not exist on backend
 #   DuplicatePreparedStatementError — same stmt name reused across backends
+PGCONN_ARGS: dict = {
+    "timeout": 10,
+    "statement_cache_size": 0,
+    "prepared_statement_cache_size": 0,
+    "command_timeout": 30,
+}
+
 # Log connection target with credentials masked
 def _mask_db_url(raw: str) -> str:
     if "@" in raw:
@@ -57,12 +64,7 @@ engine = create_async_engine(
     max_overflow=2,
     pool_recycle=300,
     pool_timeout=5,
-    connect_args={
-        "timeout": 10,
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-        "command_timeout": 30,
-    },
+    connect_args=PGCONN_ARGS,
     isolation_level="READ_COMMITTED",
 )
 
