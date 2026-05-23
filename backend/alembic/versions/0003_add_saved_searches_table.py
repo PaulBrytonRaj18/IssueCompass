@@ -32,6 +32,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_saved_searches_id", "saved_searches", ["id"])
     op.create_index("ix_saved_searches_user_id", "saved_searches", ["user_id"])
+    op.create_index("ix_saved_searches_notify", "saved_searches", ["notify"])
 
     op.drop_index("ix_issues_state_vector", table_name="issues")
     op.create_index(
@@ -50,4 +51,5 @@ def downgrade() -> None:
         ["state"],
         postgresql_where=sa.text("skill_vector IS NOT NULL"),
     )
+    op.drop_index("ix_saved_searches_notify", table_name="saved_searches")
     op.drop_table("saved_searches")

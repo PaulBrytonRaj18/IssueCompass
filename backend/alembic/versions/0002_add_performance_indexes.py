@@ -29,13 +29,9 @@ def upgrade() -> None:
     # Repositories: index for language filters
     op.create_index("ix_repositories_language", "repositories", ["primary_language"])
 
-    # Saved searches: index for notification queries
-    op.create_index("ix_saved_searches_notify", "saved_searches", ["notify"])
-
 
 def downgrade() -> None:
     op.drop_index("ix_issues_state_repo")
     op.drop_index("ix_issues_updated_at")
     op.drop_index("ix_issues_state_vector")
     op.drop_index("ix_repositories_language")
-    op.drop_index("ix_saved_searches_notify")

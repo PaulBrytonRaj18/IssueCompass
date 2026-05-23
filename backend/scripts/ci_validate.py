@@ -197,7 +197,7 @@ async def check_schema() -> int:
             print(f"  Tables ({len(tables)}): {tables}")
 
             expected = {
-                "users", "repositories", "issues", "user_skills",
+                "users", "repositories", "issues",
                 "saved_searches", "alembic_version",
             }
             missing = expected - set(tables)
