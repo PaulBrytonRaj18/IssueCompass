@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "postgresql://issuecompass:issuecompass@localhost:5432/issuecompass"
+    DB_SSL_MODE: str = "require"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"

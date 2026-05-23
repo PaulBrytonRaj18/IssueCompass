@@ -29,6 +29,13 @@ if not _database_url:
 # Strip async driver prefix — Alembic uses sync psycopg2 engine
 _migration_url = _database_url.replace("+asyncpg", "")
 
+# SSL mode — production (Supabase) requires SSL; CI/localhost does not.
+# Set DB_SSL_MODE=disable for local/GitHub Actions PostgreSQL without SSL.
+_ssl_mode = os.environ.get("DB_SSL_MODE", "")
+if not _ssl_mode:
+    from app.core.config import get_settings
+    _ssl_mode = get_settings().DB_SSL_MODE
+
 config.set_main_option("sqlalchemy.url", _migration_url)
 
 # ── Logging configuration ─────────────────────────────────────
@@ -56,7 +63,7 @@ def run_migrations_online():
         poolclass=pool.NullPool,
         connect_args={
             "connect_timeout": 10,
-            "sslmode": "require",
+            "sslmode": _ssl_mode,
         },
     )
     with connectable.connect() as connection:

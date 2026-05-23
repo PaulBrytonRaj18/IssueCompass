@@ -142,6 +142,7 @@ jobs:
         run: python -m pytest tests/ -v --tb=short --no-header 2>&1 | tail -50
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DB_SSL_MODE: disable
           REDIS_URL: memory://
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
@@ -185,6 +186,7 @@ jobs:
         working-directory: backend
     env:
       DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+      DB_SSL_MODE: disable
       SECRET_KEY: ci-secret-key-not-default-1234567890
       GITHUB_TOKEN: ci-placeholder
       OAUTH_GITHUB_CLIENT_ID: ci-placeholder
@@ -218,10 +220,13 @@ jobs:
 
       - name: 5/7 — Migration Validation (alembic current + upgrade head)
         run: |
+          set -e
+          echo "=== Pre-migration state ==="
           alembic current 2>&1
+          echo "=== Running migrations ==="
           alembic upgrade head 2>&1
+          echo "=== Post-migration state ==="
           alembic current 2>&1
-          echo "Migrations: PASSED"
 
       - name: 6/7 — Schema Validation
         run: python -m scripts.ci_db_check schema
@@ -277,11 +282,13 @@ jobs:
       - name: Apply Alembic migrations
         env:
           DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          DB_SSL_MODE: disable
         run: alembic upgrade head 2>&1
 
       - name: Start FastAPI server
         env:
           DATABASE_URL: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
+          DB_SSL_MODE: disable
           REDIS_URL: redis://localhost:6379
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
@@ -375,6 +382,7 @@ jobs:
             --network host \
             --name issuecompass-ci \
             -e DATABASE_URL=postgresql://issuecompass:issuecompass@localhost:5432/issuecompass \
+            -e DB_SSL_MODE=disable \
             -e REDIS_URL=redis://localhost:6379 \
             -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \

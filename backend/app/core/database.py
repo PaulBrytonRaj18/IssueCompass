@@ -45,7 +45,7 @@ PGCONN_ARGS: dict = {
     "timeout": 10,
     "statement_cache_size": 0,
     "command_timeout": 30,
-    "ssl": "require",
+    "ssl": settings.DB_SSL_MODE,
 }
 
 # ── DNS diagnostics at startup ───────────────────────────

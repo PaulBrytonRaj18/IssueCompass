@@ -32,7 +32,8 @@ async def reconcile() -> int:
 
     from app.core.config import get_settings
 
-    db_url = get_settings().DATABASE_URL
+    _settings = get_settings()
+    db_url = _settings.DATABASE_URL
     if not db_url:
         print("DB_RECONCILE: No DATABASE_URL found, skipping")
         return 0
@@ -55,7 +56,7 @@ async def reconcile() -> int:
             "statement_cache_size": 0,
             "timeout": 10,
             "command_timeout": 30,
-            "ssl": "require",
+            "ssl": _settings.DB_SSL_MODE,
         },
     )
     print(

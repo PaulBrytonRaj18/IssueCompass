@@ -97,8 +97,9 @@ async def check_auth() -> int:
     import asyncpg
 
     url = _db_url()
+    ssl_mode = os.environ.get("DB_SSL_MODE", "require")
     try:
-        conn = await asyncpg.connect(url, statement_cache_size=0, timeout=10)
+        conn = await asyncpg.connect(url, statement_cache_size=0, timeout=10, ssl=ssl_mode)
         ver = await conn.fetchval("SELECT version()")
         print(f"  Connected: {ver}")
         await conn.close()
@@ -139,58 +140,139 @@ def check_pgbouncer() -> int:
     return errors
 
 
+_EXPECTED_HEAD = "0003"
+
+
 async def check_schema() -> int:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from app.core.database import engine
     from sqlalchemy import text
 
+    errors = 0
     try:
         async with engine.connect() as conn:
+            # ── Check table existence ────────────────────────────────────
             r = await conn.execute(
                 text(
                     "SELECT table_name FROM information_schema.tables "
                     "WHERE table_schema='public' ORDER BY table_name"
                 )
             )
-            tables = [row[0] for row in r]
-            print(f"  Tables ({len(tables)}): {tables}")
-            expected = {"users", "repositories", "issues", "saved_searches", "alembic_version", "saved_issues"}
-            missing = expected - set(tables)
+            tables = {row[0] for row in r}
+            print(f"  Tables ({len(tables)}): {sorted(tables)}")
+
+            expected_tables = {
+                "users", "repositories", "issues",
+                "saved_searches", "saved_issues", "alembic_version",
+            }
+            missing = expected_tables - tables
             if missing:
-                _fail("schema", f"missing tables: {missing}")
-                return 1
-            _ok("schema", f"all {len(expected)} expected tables present")
-            return 0
+                _fail("schema", f"missing tables: {sorted(missing)}")
+                errors += 1
+            else:
+                _ok("schema", f"all {len(expected_tables)} expected tables present")
+
+            # ── Check alembic_version head revision ─────────────────────
+            try:
+                r = await conn.execute(text("SELECT version_num FROM alembic_version"))
+                head = r.scalar()
+                if head == _EXPECTED_HEAD:
+                    _ok("schema.revision", f"head={head}")
+                else:
+                    _fail("schema.revision", f"expected={_EXPECTED_HEAD}, actual={head}")
+                    errors += 1
+            except Exception as e:
+                _fail("schema.revision", f"cannot read alembic_version: {e}")
+                errors += 1
+
+            # ── Check vector extension ──────────────────────────────────
+            try:
+                r = await conn.execute(
+                    text(
+                        "SELECT installed_version FROM pg_available_extensions "
+                        "WHERE name='vector'"
+                    )
+                )
+                ext_ver = r.scalar()
+                if ext_ver:
+                    _ok("schema.vector", f"installed (version={ext_ver})")
+                else:
+                    _fail("schema.vector", "vector extension NOT installed")
+                    errors += 1
+            except Exception as e:
+                _fail("schema.vector", f"cannot check vector extension: {e}")
+                errors += 1
     except Exception as e:
-        _fail("schema", str(e))
+        _fail("schema", f"connection failed: {e}")
         return 1
+
+    return errors
 
 
 async def check_runtime() -> int:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-    from app.core.database import AsyncSessionLocal, engine
+    from app.core.database import PGCONN_ARGS, AsyncSessionLocal, engine
     from sqlalchemy import text
 
+    errors = 0
+
+    # ── Raw connection: verify statement cache is disabled ──────────────
+    try:
+        import asyncpg
+
+        raw_conn = await asyncpg.connect(
+            _db_url(),
+            statement_cache_size=0,
+            timeout=10,
+            ssl=os.environ.get("DB_SSL_MODE", "require"),
+        )
+        await raw_conn.close()
+        _ok("runtime.raw", "asyncpg.connect with statement_cache_size=0 succeeded")
+    except Exception as e:
+        _fail("runtime.raw", f"raw asyncpg.connect failed: {e}")
+        errors += 1
+
+    # ── Engine-based connection: SELECT 1 ────────────────────────────────
     try:
         async with engine.connect() as conn:
             r = await conn.execute(text("SELECT 1"))
             assert r.scalar() == 1
-            print("  engine.connect SELECT 1: OK")
+            _ok("runtime.engine", "SELECT 1 via engine.connect")
     except Exception as e:
-        _fail("runtime", f"engine.connect: {e}")
-        return 1
+        _fail("runtime.engine", str(e))
+        errors += 1
 
+    # ── Session-based connection: SELECT 1 ───────────────────────────────
     try:
         async with AsyncSessionLocal() as s:
             r = await s.execute(text("SELECT 1 AS a"))
             assert r.scalar() == 1
-            print("  session SELECT 1: OK")
+            _ok("runtime.session", "SELECT 1 via AsyncSessionLocal")
     except Exception as e:
-        _fail("runtime", f"session: {e}")
-        return 1
+        _fail("runtime.session", str(e))
+        errors += 1
 
-    _ok("runtime", "asyncpg connectivity verified")
-    return 0
+    # ── Verify engine uses the expected PgBouncer-safe config ───────────
+    pool_name = type(engine.pool).__name__
+    if pool_name != "NullPool":
+        _fail("runtime.poolclass", f"expected NullPool, got {pool_name}")
+        errors += 1
+    else:
+        _ok("runtime.poolclass", "NullPool")
+
+    ssl_val = PGCONN_ARGS.get("ssl", "not-set")
+    _ok("runtime.ssl", f"ssl={ssl_val}")
+
+    stmt_cache = PGCONN_ARGS.get("statement_cache_size", "not-set")
+    if stmt_cache != 0:
+        _fail("runtime.stmt_cache", f"statement_cache_size={stmt_cache}, expected 0")
+        errors += 1
+    else:
+        _ok("runtime.stmt_cache", "statement_cache_size=0")
+
+    if errors == 0:
+        _ok("runtime", "runtime DB validation passed")
+    return errors
 
 
 def main() -> int:
