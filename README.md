@@ -138,7 +138,7 @@ All Redis operations are wrapped in try/except. When Redis is unreachable:
 
 ```bash
 cp .env.example .env
-# Edit .env: set GITHUB_TOKEN, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GROQ_API_KEY
+# Edit .env: set GITHUB_TOKEN, OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET, GROQ_API_KEY
 docker compose up --build
 ```
 
@@ -264,7 +264,7 @@ env-check (verify all 9 secrets exist)
 
 | Job | What it validates |
 |---|---|
-| `env-check` | All 9 secrets exist (DATABASE_URL, REDIS_URL, SECRET_KEY, GITHUB_TOKEN, GITHUB_CLIENT_ID/SECRET, GROQ_API_KEY, JINA_API_KEY, RENDER_DEPLOY_HOOK_URL) |
+| `env-check` | All 9 secrets exist (DATABASE_URL, REDIS_URL, SECRET_KEY, GITHUB_TOKEN, OAUTH_GITHUB_CLIENT_ID/SECRET, GROQ_API_KEY, JINA_API_KEY, RENDER_DEPLOY_HOOK_URL) |
 | `backend-lint` | ruff (PEP 8) + mypy (strict) — zero errors |
 | `frontend` | npm ci + lint + TypeScript `--noEmit` |
 | `backend-test` | 104 pytest (mocked DB/Redis, no services needed) |

@@ -46,8 +46,8 @@ class Settings(BaseSettings):
 
     # GitHub
     GITHUB_TOKEN: str = ""
-    GITHUB_CLIENT_ID: str = ""
-    GITHUB_CLIENT_SECRET: str = ""
+    OAUTH_GITHUB_CLIENT_ID: str = ""
+    OAUTH_GITHUB_CLIENT_SECRET: str = ""
     GITHUB_API_BASE: str = "https://api.github.com"
     GITHUB_GRAPHQL_URL: str = "https://api.github.com/graphql"
 

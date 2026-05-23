@@ -29,7 +29,7 @@ jobs:
     name: Env Validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Verify required secrets exist
         env:
@@ -37,8 +37,8 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_CLIENT_ID: ${{ secrets.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ secrets.GITHUB_CLIENT_SECRET }}
+          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+          OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
@@ -46,7 +46,7 @@ jobs:
           missing=""
           for var in \
             DATABASE_URL REDIS_URL SECRET_KEY GITHUB_TOKEN \
-            GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET GROQ_API_KEY \
+            OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET GROQ_API_KEY \
             JINA_API_KEY RENDER_DEPLOY_HOOK_URL
           do
             if [ -z "${!var}" ]; then
@@ -71,10 +71,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -101,12 +101,12 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -130,10 +130,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -148,8 +148,8 @@ jobs:
           REDIS_URL: memory://
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
-          GITHUB_CLIENT_ID: ci-placeholder
-          GITHUB_CLIENT_SECRET: ci-placeholder
+          OAUTH_GITHUB_CLIENT_ID: ci-placeholder
+          OAUTH_GITHUB_CLIENT_SECRET: ci-placeholder
           GROQ_API_KEY: ""
           JINA_API_KEY: ""
           AI_ENABLED: "false"
@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload test report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: pytest-report
           path: backend/tests/
@@ -187,10 +187,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -204,8 +204,8 @@ jobs:
           DATABASE_URL_DIRECT: postgresql://issuecompass:issuecompass@localhost:5432/issuecompass
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
-          GITHUB_CLIENT_ID: ci-placeholder
-          GITHUB_CLIENT_SECRET: ci-placeholder
+          OAUTH_GITHUB_CLIENT_ID: ci-placeholder
+          OAUTH_GITHUB_CLIENT_SECRET: ci-placeholder
           JINA_API_KEY: ci-placeholder
           AI_ENABLED: "false"
           EMBEDDINGS_ENABLED: "false"
@@ -245,10 +245,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -268,8 +268,8 @@ jobs:
           REDIS_URL: redis://localhost:6379
           SECRET_KEY: ci-secret-key-not-default-1234567890
           GITHUB_TOKEN: ci-placeholder
-          GITHUB_CLIENT_ID: ci-placeholder
-          GITHUB_CLIENT_SECRET: ci-placeholder
+          OAUTH_GITHUB_CLIENT_ID: ci-placeholder
+          OAUTH_GITHUB_CLIENT_SECRET: ci-placeholder
           GROQ_API_KEY: ci-placeholder
           JINA_API_KEY: ci-placeholder
           AI_ENABLED: "false"
@@ -346,7 +346,7 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build Docker image
         run: docker build -t issuecompass-backend:ci -f Dockerfile .
@@ -361,8 +361,8 @@ jobs:
             -e REDIS_URL=redis://localhost:6379 \
             -e SECRET_KEY=${{ secrets.SECRET_KEY }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-            -e GITHUB_CLIENT_ID=${{ secrets.GITHUB_CLIENT_ID }} \
-            -e GITHUB_CLIENT_SECRET=${{ secrets.GITHUB_CLIENT_SECRET }} \
+            -e OAUTH_GITHUB_CLIENT_ID=${{ secrets.OAUTH_GITHUB_CLIENT_ID }} \
+            -e OAUTH_GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }} \
             -e GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
             -e JINA_API_KEY=${{ secrets.JINA_API_KEY }} \
             -e AI_ENABLED=false \

@@ -7,8 +7,8 @@
 #   1. Create a Supabase Postgres instance
 #   2. Create an Upstash Redis instance
 #   3. Set secrets in Render Dashboard → Environment:
-#      DATABASE_URL, REDIS_URL, SECRET_KEY, GITHUB_CLIENT_ID,
-#      GITHUB_CLIENT_SECRET, GITHUB_TOKEN, GROQ_API_KEY,
+#      DATABASE_URL, REDIS_URL, SECRET_KEY, OAUTH_GITHUB_CLIENT_ID,
+#      OAUTH_GITHUB_CLIENT_SECRET, GITHUB_TOKEN, GROQ_API_KEY,
 #      JINA_API_KEY, NEXTAUTH_SECRET, METRICS_API_KEY
 # ============================================================
 
@@ -37,9 +37,9 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
-      - key: GITHUB_CLIENT_ID
+      - key: OAUTH_GITHUB_CLIENT_ID
         sync: false
-      - key: GITHUB_CLIENT_SECRET
+      - key: OAUTH_GITHUB_CLIENT_SECRET
         sync: false
       - key: GITHUB_TOKEN
         sync: false
@@ -75,7 +75,7 @@ services:
         sync: false
       - key: NEXTAUTH_SECRET
         sync: false
-      - key: GITHUB_CLIENT_ID
+      - key: OAUTH_GITHUB_CLIENT_ID
         sync: false
-      - key: GITHUB_CLIENT_SECRET
+      - key: OAUTH_GITHUB_CLIENT_SECRET
         sync: false

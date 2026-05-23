@@ -10,7 +10,7 @@ First off — thank you for considering a contribution. IssueCompass is built fo
 git clone https://github.com/yourusername/issuecompass.git
 cd issuecompass
 cp .env.example .env
-# Fill in GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, NEXTAUTH_SECRET
+# Fill in OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET, NEXTAUTH_SECRET
 docker-compose up --build
 ```
 
