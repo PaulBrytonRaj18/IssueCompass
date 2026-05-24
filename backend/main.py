@@ -1,5 +1,7 @@
+import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
@@ -7,16 +9,27 @@ from app.core.database import close_db, get_pool_status
 from app.core.monitoring import get_metrics, setup_monitoring
 from app.core.ratelimit import limiter
 from app.routes import auth, github, issues, maintainer, searches
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from pythonjsonlogger import json as jsonlogger
 from slowapi.errors import RateLimitExceeded
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+
+class JsonLogFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        log_record["timestamp"] = datetime.now(timezone.utc).isoformat()
+        log_record["level"] = record.levelname
+        if not log_record.get("name"):
+            log_record["name"] = record.name
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(
+    JsonLogFormatter("%(timestamp)s %(level)s %(name)s %(message)s")
 )
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger("issuecompass")
 
 settings = get_settings()
@@ -121,6 +134,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 
 API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)

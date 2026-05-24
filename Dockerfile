@@ -39,6 +39,15 @@ COPY --from=frontend-builder /app/.next/static ./frontend/.next/static
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=755 start.sh /start.sh
 
+RUN addgroup --system app && adduser --system --ingroup app app \
+    && mkdir -p /var/lib/nginx/proxy /var/cache/nginx \
+    && chown -R app:app /app /var/lib/nginx /var/cache/nginx /tmp /var/log/nginx
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+USER app
+
 EXPOSE 8080
 
 CMD ["/start.sh"]

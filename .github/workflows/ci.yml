@@ -116,6 +116,12 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: "https://openissue-backend.onrender.com"
+          NEXTAUTH_URL: "http://localhost:3000"
+
   # ────────────────────────────────────────────────────────────
   # BACKEND TEST: pytest (mocked DB, no postgres needed)
   # ────────────────────────────────────────────────────────────

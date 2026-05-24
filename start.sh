@@ -17,7 +17,8 @@ export PORT=${PORT:-8080}
 case "$PORT" in
     ''|*[!0-9]*) echo "FATAL: PORT must be numeric, got '$PORT'"; exit 1 ;;
 esac
-sed -i "s/\${PORT}/$PORT/g" /etc/nginx/nginx.conf
+cp /etc/nginx/nginx.conf /tmp/nginx.conf
+sed -i "s/\${PORT}/$PORT/g" /tmp/nginx.conf
 
 cd /app/backend
 echo "Running database reconciliation..."
@@ -43,4 +44,4 @@ FRONTEND_PID=$!
 
 sleep 1
 
-nginx -g 'daemon off;'
+nginx -c /tmp/nginx.conf -g 'daemon off;'

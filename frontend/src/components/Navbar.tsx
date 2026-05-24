@@ -61,6 +61,9 @@ export const Navbar = memo(function Navbar() {
           <div className="relative">
             <button
               onClick={toggleMenu}
+              aria-expanded={menuOpen}
+              aria-haspopup="true"
+              aria-label="User menu"
               className="flex items-center gap-2 p-1 rounded-md hover:bg-[var(--surface)] transition-colors"
             >
               {user?.avatarUrl ? (
@@ -82,10 +85,15 @@ export const Navbar = memo(function Navbar() {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden">
+              <div
+                role="menu"
+                aria-label="User menu options"
+                className="absolute right-0 top-full mt-2 w-44 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden"
+              >
                 <a
                   href={`https://github.com/${user?.username}`}
                   target="_blank"
+                  role="menuitem"
                   className="flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] transition-colors"
                 >
                   <Github size={13} />
@@ -94,6 +102,7 @@ export const Navbar = memo(function Navbar() {
                 <div className="border-t border-[var(--border)]" />
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
                 >
                   <LogOut size={13} />

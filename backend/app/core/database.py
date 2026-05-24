@@ -15,6 +15,7 @@ PgBouncer Session Pooling Notes:
   parameter in any version up to 0.29.x.  Only statement_cache_size exists.
 """
 
+import asyncio
 import logging
 import socket
 
@@ -116,12 +117,31 @@ class Base(DeclarativeBase):
     pass
 
 
+async def _enter_session(session):
+    """Open session connection — extracted so tenacity can retry it."""
+    await session.__aenter__()
+
+
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+_enter_session = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    reraise=True,
+)(_enter_session)
+
+
 async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+    session = AsyncSessionLocal()
+    try:
+        await _enter_session(session)
+    except Exception:
+        await session.__aexit__(None, None, None)
+        raise
+    try:
+        yield session
+    finally:
+        await session.close()
 
 
 async def close_db():

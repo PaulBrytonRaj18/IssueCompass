@@ -50,25 +50,90 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let _refreshing = false;
+let _pendingRequests: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+function _onRefreshed(token: string) {
+  _pendingRequests.forEach((p) => p.resolve(token));
+  _pendingRequests = [];
+}
+
+function _onRefreshFailed(err: unknown) {
+  _pendingRequests.forEach((p) => p.reject(err));
+  _pendingRequests = [];
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (axios.isCancel(error)) return Promise.reject(error);
 
-    if (error.response?.status === 429) {
+    const status = error.response?.status;
+    const config = error.config;
+
+    if (status === 429) {
       error.userMessage = "Too many requests. Please wait a moment and try again.";
       return Promise.reject(error);
     }
 
-    const config = error.config;
+    if (status === 401 && !config?._retry && config?.url && !config.url.includes("/auth/refresh") && !config.url.includes("/auth/github/callback")) {
+      if (!_refreshing) {
+        _refreshing = true;
+        const oldToken = _authToken;
+        setAuthToken(null);
+        try {
+          const refreshResp = await api.post("/auth/refresh");
+          const newToken: string = refreshResp.data.access_token;
+          setAuthToken(newToken);
+          _onRefreshed(newToken);
+          config._retry = true;
+          config.headers.Authorization = `Bearer ${newToken}`;
+          return api(config);
+        } catch (refreshError) {
+          _onRefreshFailed(refreshError);
+          setAuthToken(oldToken);
+          error.userMessage = "Your session has expired. Please sign in again.";
+          return Promise.reject(error);
+        } finally {
+          _refreshing = false;
+        }
+      } else {
+        return new Promise((resolve, reject) => {
+          _pendingRequests.push({
+            resolve: (token: string) => {
+              config._retry = true;
+              config.headers.Authorization = `Bearer ${token}`;
+              resolve(api(config));
+            },
+            reject: () => {
+              error.userMessage = "Your session has expired. Please sign in again.";
+              reject(error);
+            },
+          });
+        });
+      }
+    }
+
     if (!config || config._retry) return Promise.reject(error);
-    const isServerError = error.response?.status >= 500;
+    const isServerError = status >= 500;
     const isNetworkError = !error.response && error.code === "ERR_NETWORK";
-    if ((isServerError || isNetworkError) && !config._retry) {
+    if (isServerError || isNetworkError) {
       config._retry = true;
       await new Promise((r) => setTimeout(r, 1000));
       return api(config);
     }
+
+    if (status === 404) {
+      error.userMessage = "The requested resource was not found.";
+    } else if (status >= 500) {
+      error.userMessage = "Server error. Please try again later.";
+    } else if (!error.response) {
+      error.userMessage = "Network error. Check your connection.";
+    }
+
     return Promise.reject(error);
   }
 );

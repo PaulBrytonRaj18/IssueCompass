@@ -324,6 +324,39 @@ class TestMaintainerEndpoints:
         resp = client.get("/api/v1/maintainer/repos/1/contributors")
         assert resp.status_code == 401
 
+    def test_overview_with_auth(self, client):
+        """Auth'd maintainer overview should call fetch_user_repos."""
+        from unittest.mock import patch
+
+        token = create_access_token({"sub": "1"})
+        with patch("app.routes.maintainer.github_service.fetch_user_repos") as mock:
+            mock.return_value = []
+            resp = client.get(
+                "/api/v1/maintainer/overview",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "total_repos" in data
+            assert data["total_repos"] == 0
+
+    def test_overview_with_repos(self, client):
+        """Auth'd maintainer overview with mock repo data."""
+        from unittest.mock import patch
+
+        token = create_access_token({"sub": "1"})
+        with patch("app.routes.maintainer.github_service.fetch_user_repos") as mock:
+            mock.return_value = [
+                {"full_name": "owner/repo1", "fork": False, "archived": False},
+            ]
+            resp = client.get(
+                "/api/v1/maintainer/overview",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "repos" in data
+
 
 class TestMetricsEndpoint:
     def test_metrics_public_when_no_key_set(self, client):

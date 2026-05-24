@@ -13,8 +13,13 @@ import {
   Star,
   Calendar,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Navbar } from "@/components/Navbar";
-import { SkillFingerprintPanel } from "@/components/SkillFingerprint";
+
+const SkillFingerprintPanel = dynamic(
+  () => import("@/components/SkillFingerprint").then((m) => ({ default: m.SkillFingerprintPanel })),
+  { ssr: false },
+);
 import { PageLoader } from "@/components/Spinner";
 import { useSyncUserToBackend } from "@/lib/hooks/use-auth";
 import { useFingerprint, useGitHubUser, useAnalyzeProfile } from "@/lib/hooks/use-github";

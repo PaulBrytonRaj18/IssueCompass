@@ -179,6 +179,8 @@ export const IssueCard = memo(function IssueCard({ match, index = 0 }: IssueCard
             <button
               onClick={handleSave}
               disabled={saving}
+              aria-label={saved ? "Unsave issue" : "Save issue"}
+              aria-pressed={saved}
               className={`p-1.5 rounded-md transition-colors ${
                 saved
                   ? "text-[var(--accent)]"
@@ -192,6 +194,7 @@ export const IssueCard = memo(function IssueCard({ match, index = 0 }: IssueCard
               href={issue.html_url}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={`View issue on GitHub: ${issue.title}`}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-2xs font-medium bg-[var(--surface-2)] text-[var(--foreground-dim)] hover:text-[var(--foreground)] hover:bg-[var(--border)] transition-colors border border-[var(--border)]"
             >
               View

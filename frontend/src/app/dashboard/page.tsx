@@ -3,10 +3,15 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Filter, RefreshCw, Zap, AlertCircle } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Navbar } from "@/components/Navbar";
 import { IssueCard } from "@/components/IssueCard";
-import { SkillFingerprintPanel } from "@/components/SkillFingerprint";
 import { EmptyState } from "@/components/EmptyState";
+
+const SkillFingerprintPanel = dynamic(
+  () => import("@/components/SkillFingerprint").then((m) => ({ default: m.SkillFingerprintPanel })),
+  { ssr: false },
+);
 import { PageLoader } from "@/components/Spinner";
 import { useMatches, useTriggerIndex } from "@/lib/hooks/use-issues";
 import { useSyncUserToBackend } from "@/lib/hooks/use-auth";

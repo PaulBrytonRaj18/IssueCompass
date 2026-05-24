@@ -1,20 +1,37 @@
-"""GitHub service tests — require network access to GitHub API."""
+"""GitHub service tests — all external calls are mocked."""
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from app.services.github_service import (
     fetch_live_issues_for_user,
+    fetch_user,
+    search_issues_global,
 )
 
 
-@pytest.mark.skip(reason="Requires network access to GitHub API")
 @pytest.mark.asyncio
 async def test_search_issues_global_returns_dict():
-    pass
+    fake_headers = {"X-RateLimit-Remaining": "100"}
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = fake_headers
+    mock_response.json = MagicMock(return_value={"items": [], "total_count": 0})
+
+    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+        result = await search_issues_global(language="python", label="good first issue")
+        assert isinstance(result, dict)
+        assert "items" in result
 
 
-@pytest.mark.skip(reason="Requires network access to GitHub API")
 @pytest.mark.asyncio
 async def test_fetch_user_not_found():
-    pass
+    mock_response = MagicMock()
+    mock_response.status_code = 404
+    mock_response.headers = {}
+
+    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+        result = await fetch_user("nonexistent-user-that-does-not-exist")
+        assert result is None
 
 
 class TestFetchLiveIssuesForUser:

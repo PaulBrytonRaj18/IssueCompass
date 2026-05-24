@@ -89,6 +89,8 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         {stats.map((stat) => (
           <div
             key={stat.label}
+            role="figure"
+            aria-label={`${stat.label}: ${stat.value}`}
             className="flex flex-col items-center p-2.5 rounded-md bg-[var(--surface-2)] border border-[var(--border)]"
           >
             <div className="text-[var(--muted)] mb-0.5">{stat.icon}</div>
@@ -100,7 +102,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         ))}
       </div>
 
-      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]" role="progressbar" aria-label="Experience level" aria-valuenow={expConfig.width === "25%" ? 25 : expConfig.width === "60%" ? 60 : 90} aria-valuemin={0} aria-valuemax={100}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-2xs text-[var(--muted)] font-mono uppercase tracking-wider">
             Experience
@@ -123,7 +125,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         </div>
       </div>
 
-      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]" role="group" aria-label="Languages">
         <div className="flex items-center gap-2 mb-2.5">
           <Layers size={12} className="text-[var(--muted)]" />
           <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Languages</span>
@@ -133,7 +135,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
             const color =
               LANGUAGE_COLORS[lang.toLowerCase()] ?? "var(--accent)";
             return (
-              <div key={lang}>
+              <div key={lang} role="progressbar" aria-label={`${lang} proficiency`} aria-valuenow={Math.round(score * 100)} aria-valuemin={0} aria-valuemax={100}>
                 <div className="flex justify-between mb-0.5">
                   <span className="text-xs text-[var(--foreground-dim)] capitalize">
                     {lang}
@@ -155,7 +157,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
       </div>
 
       {radarData.length >= 3 && (
-        <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+        <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]" role="img" aria-label="Skill distribution radar chart">
           <div className="flex items-center gap-2 mb-2.5">
             <TrendingUp size={12} className="text-[var(--muted)]" />
             <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Distribution</span>
@@ -188,7 +190,7 @@ export const SkillFingerprintPanel = memo(function SkillFingerprintPanel({ finge
         </div>
       )}
 
-      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]">
+      <div className="p-3 rounded-md bg-[var(--surface-2)] border border-[var(--border)]" role="group" aria-label="Top skills">
         <div className="flex items-center gap-2 mb-2.5">
           <Code2 size={12} className="text-[var(--muted)]" />
           <span className="text-2xs font-mono text-[var(--muted)] uppercase tracking-wider">Top Skills</span>

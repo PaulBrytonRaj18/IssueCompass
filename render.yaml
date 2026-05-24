@@ -10,7 +10,8 @@
 #      DATABASE_URL, REDIS_URL, SECRET_KEY,
 #      OAUTH_GITHUB_CLIENT_ID, OAUTH_GITHUB_CLIENT_SECRET,
 #      GITHUB_TOKEN, GROQ_API_KEY, JINA_API_KEY,
-#      NEXTAUTH_SECRET, METRICS_API_KEY
+#      NEXTAUTH_SECRET, METRICS_API_KEY,
+#      NEXTAUTH_URL, ALLOWED_ORIGINS, FRONTEND_URL
 # ============================================================
 
 services:
@@ -54,10 +55,14 @@ services:
         sync: false
       - key: NEXTAUTH_URL
         sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
 
   # ─── Next.js Frontend ───────────────────────────────────────
   - type: web
-    name: issuecompass-frontend
+    name: openissue-frontend
     runtime: node
     region: oregon
     plan: starter

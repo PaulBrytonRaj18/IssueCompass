@@ -45,7 +45,7 @@ def _set_token_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=max_age,
         httponly=True,
-        samesite="lax",
+        samesite="strict",
         secure=settings.COOKIE_SECURE,
         path="/",
     )
