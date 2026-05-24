@@ -16,7 +16,7 @@
 services:
   # ─── FastAPI Backend ─────────────────────────────────────────
   - type: web
-    name: issuecompass-backend
+    name: openissue-backend
     runtime: python
     region: oregon
     plan: starter
@@ -70,7 +70,7 @@ services:
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web
-          name: issuecompass-backend
+          name: openissue-backend
           property: url
       - key: NEXTAUTH_URL
         sync: false

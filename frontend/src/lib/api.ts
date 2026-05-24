@@ -54,6 +54,12 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (axios.isCancel(error)) return Promise.reject(error);
+
+    if (error.response?.status === 429) {
+      error.userMessage = "Too many requests. Please wait a moment and try again.";
+      return Promise.reject(error);
+    }
+
     const config = error.config;
     if (!config || config._retry) return Promise.reject(error);
     const isServerError = error.response?.status >= 500;
@@ -106,7 +112,9 @@ export const issuesApi = {
   getMatches: (
     params?: {
       language?: string;
-      label?: string;
+      is_good_first_issue?: boolean;
+      is_help_wanted?: boolean;
+      difficulty?: string;
       limit?: number;
       offset?: number;
     },

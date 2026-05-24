@@ -10,7 +10,7 @@ import { cacheConfig } from "@/lib/query-client";
 
 type MatchesParams = Parameters<typeof issuesApi.getMatches>[0];
 
-export function useMatches(params?: MatchesParams) {
+export function useMatches(params?: MatchesParams, enabled?: boolean) {
   return useQuery({
     queryKey: queryKeys.issues.matches(
       params as Record<string, unknown> | undefined
@@ -20,6 +20,7 @@ export function useMatches(params?: MatchesParams) {
     staleTime: cacheConfig.issues.matches.staleTime,
     gcTime: cacheConfig.issues.matches.gcTime,
     retry: 2,
+    enabled: enabled !== false,
   });
 }
 

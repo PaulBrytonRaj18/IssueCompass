@@ -47,7 +47,8 @@ export default function DashboardPage() {
 
   const matchesParams = {
     ...(langFilter !== "All" && { language: langFilter }),
-    ...(labelFilter && { label: labelFilter }),
+    ...(labelFilter === "good_first" && { is_good_first_issue: true }),
+    ...(labelFilter === "help_wanted" && { is_help_wanted: true }),
     limit: 30,
   };
 
@@ -57,7 +58,8 @@ export default function DashboardPage() {
     error: matchesError,
     refetch: refetchMatches,
   } = useMatches(
-    Object.keys(matchesParams).length > 1 ? matchesParams : undefined
+    Object.keys(matchesParams).length > 1 ? matchesParams : undefined,
+    syncMutation.isSuccess
   );
 
   useEffect(() => {

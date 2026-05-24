@@ -19,14 +19,20 @@ export function makeQueryClient() {
       queries: {
         staleTime: STALE_TIMES.SHORT,
         gcTime: GC_TIMES.SHORT,
-        retry: 2,
+        retry: (failureCount, error) => {
+          if ((error as { response?: { status?: number } })?.response?.status === 429) return false;
+          return failureCount < 2;
+        },
         retryDelay: (attemptIndex) =>
           Math.min(1000 * Math.pow(2, attemptIndex), 10000),
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
       },
       mutations: {
-        retry: 0,
+        retry: (failureCount, error) => {
+          if ((error as { response?: { status?: number } })?.response?.status === 429) return false;
+          return failureCount < 0;
+        },
       },
     },
   });
