@@ -1,5 +1,6 @@
 "use client";
 import { useState, memo, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   MessageSquare,
   ExternalLink,
@@ -56,9 +57,13 @@ export const IssueCard = memo(function IssueCard({ match, index = 0 }: IssueCard
       : "var(--muted)";
 
   return (
-    <div
-      className="rounded-lg border border-[var(--border)] bg-[var(--surface)] animate-fade-in overflow-hidden"
-      style={{ animationDelay: `${index * 60}ms` }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.35, ease: "easeOut" }}
+      whileHover={{ scale: 1.005 }}
+      whileTap={{ scale: 0.998 }}
+      className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
     >
       {/* Match bar */}
       <div className="match-bar rounded-none" style={{ borderRadius: 0 }}>
@@ -203,6 +208,6 @@ export const IssueCard = memo(function IssueCard({ match, index = 0 }: IssueCard
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 });

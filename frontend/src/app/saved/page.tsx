@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Bookmark, ExternalLink } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { EmptyState } from "@/components/EmptyState";
-import { PageLoader } from "@/components/Spinner";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { useSavedIssues } from "@/lib/hooks/use-issues";
 import { complexityLabel, complexityColor, timeAgo, LANGUAGE_COLORS } from "@/lib/types";
 import type { Issue } from "@/lib/types";
@@ -20,7 +20,16 @@ export default function SavedPage() {
   }
 
   if (status === "loading" || isLoading) {
-    return <><Navbar /><PageLoader message="Loading saved issues..." /></>;
+    return (
+      <>
+        <Navbar />
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="max-w-3xl mx-auto space-y-3">
+            {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
+      </>
+    );
   }
 
   const issueList = (issues as Issue[]) ?? [];

@@ -37,6 +37,9 @@ export function useAnalyzeProfile() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.github.fingerprint,
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issues.matches(),
+      });
     },
     retry: 1,
   });

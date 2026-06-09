@@ -72,7 +72,5 @@ htmlcov/
 *.rej
 
 
-
-/reference
-COMPREHENSIVE_SYSTEM_REPORT.md
-ISSUECOMPASS_LIVE_MATCHING_REFACTOR.md
+/design-docx
+/graphify-out

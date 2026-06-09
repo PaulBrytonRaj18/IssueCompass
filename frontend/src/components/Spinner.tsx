@@ -6,6 +6,8 @@ export function Spinner({ size = 20 }: { size?: number }) {
       viewBox="0 0 24 24"
       fill="none"
       className="animate-spin"
+      role="status"
+      aria-label="Loading"
       style={{ color: "var(--accent)" }}
     >
       <circle

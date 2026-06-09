@@ -11,7 +11,12 @@ const protectedRoutes = [
   "/saved",
 ];
 
-const TOKEN_COOKIE = "ic_token";
+const IC_TOKEN_COOKIE = "ic_token";
+
+// NextAuth v4 stores its session in this cookie (non-HTTPS) or
+// __Secure-next-auth.session-token (HTTPS). Check both.
+const NEXTAUTH_COOKIE_HTTP = "next-auth.session-token";
+const NEXTAUTH_COOKIE_HTTPS = "__Secure-next-auth.session-token";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -24,15 +29,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get(TOKEN_COOKIE)?.value;
-
-  if (!token) {
-    const loginUrl = new URL("/", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Allow through if the user has the backend ic_token
+  const icToken = request.cookies.get(IC_TOKEN_COOKIE)?.value;
+  if (icToken) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // Also allow through if the user has a NextAuth session
+  // (they may not have ic_token yet — it's set after the dashboard triggers
+  // the backend auth sync)
+  const nextAuthSession =
+    request.cookies.get(NEXTAUTH_COOKIE_HTTP)?.value ||
+    request.cookies.get(NEXTAUTH_COOKIE_HTTPS)?.value;
+  if (nextAuthSession) {
+    return NextResponse.next();
+  }
+
+  const loginUrl = new URL("/", request.url);
+  loginUrl.searchParams.set("redirect", pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {

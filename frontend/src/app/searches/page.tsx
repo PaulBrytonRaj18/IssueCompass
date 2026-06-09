@@ -82,7 +82,16 @@ export default function SavedSearchesPage() {
           </p>
         </div>
 
-        {isLoading && <PageLoader message="Loading saved searches..." />}
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 space-y-2 animate-pulse">
+                <div className="h-4 w-1/2 rounded bg-[var(--surface-2)]" />
+                <div className="h-3 w-3/4 rounded bg-[var(--surface-2)]" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {!isLoading && searchList.length === 0 && (
           <EmptyState

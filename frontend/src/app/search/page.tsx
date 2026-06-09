@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { IssueCard } from "@/components/IssueCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageLoader } from "@/components/Spinner";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { useSmartSearch, useSearch } from "@/lib/hooks/use-issues";
 import { useSuggestions, useSaveSearch } from "@/lib/hooks/use-searches";
 import { MatchedIssue, SmartSearchResult, SuggestionItem } from "@/lib/types";
@@ -218,6 +219,10 @@ function SearchPageContent() {
                 if (suggestionsQuery.data?.suggestions?.length > 0) setShowSuggestions(true);
               }}
               placeholder='e.g. "beginner React issues" or "FastAPI backend bugs"'
+              required
+              minLength={2}
+              maxLength={200}
+              aria-label="Search query"
               className="w-full pl-9 pr-9 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-dim)] transition-colors"
             />
             {query && (
@@ -338,34 +343,69 @@ function SearchPageContent() {
         )}
 
         {showSaveDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Save search"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowSaveDialog(false);
+              if (e.key === "Tab") {
+                const els = e.currentTarget.querySelectorAll<HTMLElement>(
+                  'input, button, [tabindex]:not([tabindex="-1"])'
+                );
+                const first = els[0];
+                const last = els[els.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                  e.preventDefault();
+                  last?.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                  e.preventDefault();
+                  first?.focus();
+                }
+              }
+            }}
+          >
             <div className="bg-[var(--surface)] rounded-lg p-6 w-96 border border-[var(--border)] shadow-xl">
               <h3 className="font-semibold text-[var(--foreground)] mb-3">Save Search</h3>
-              <input
-                type="text"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                placeholder="e.g. Daily React beginner issues"
-                className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm mb-4 focus:outline-none focus:border-[var(--accent)]"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && saveSearch()}
-              />
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setShowSaveDialog(false)}
-                  className="px-3 py-2 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
-                  Cancel
-                </button>
-                <button onClick={saveSearch}
-                  disabled={!saveName.trim() || saveSearchMutation.isPending}
-                  className="px-3 py-2 rounded-md bg-[var(--accent)] text-black text-xs font-semibold hover:bg-[var(--accent)]/90 disabled:opacity-50">
-                  Save
-                </button>
-              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (saveName.trim()) saveSearch();
+                }}
+              >
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder="e.g. Daily React beginner issues"
+                  required
+                  maxLength={100}
+                  aria-label="Search name"
+                  className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm mb-4 focus:outline-none focus:border-[var(--accent)]"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowSaveDialog(false)}
+                    className="px-3 py-2 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                    Cancel
+                  </button>
+                  <button type="submit"
+                    disabled={!saveName.trim() || saveSearchMutation.isPending}
+                    className="px-3 py-2 rounded-md bg-[var(--accent)] text-black text-xs font-semibold hover:bg-[var(--accent)]/90 disabled:opacity-50">
+                    Save
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
 
-        {isLoading && <PageLoader message="Searching issues..." />}
+        {isLoading && (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        )}
 
         {!isLoading && searched && matches.length === 0 && (
           <EmptyState

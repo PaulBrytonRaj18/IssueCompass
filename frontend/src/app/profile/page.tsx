@@ -21,6 +21,7 @@ const SkillFingerprintPanel = dynamic(
   { ssr: false },
 );
 import { PageLoader } from "@/components/Spinner";
+import { SkeletonRadar } from "@/components/SkeletonCard";
 import { useSyncUserToBackend } from "@/lib/hooks/use-auth";
 import { useFingerprint, useGitHubUser, useAnalyzeProfile } from "@/lib/hooks/use-github";
 
@@ -199,7 +200,9 @@ export default function ProfilePage() {
             </div>
 
             {fpLoading && !fingerprint && (
-              <PageLoader message="Loading skill fingerprint..." />
+              <div className="p-6">
+                <SkeletonRadar />
+              </div>
             )}
 
             {!fpLoading && fingerprint ? (

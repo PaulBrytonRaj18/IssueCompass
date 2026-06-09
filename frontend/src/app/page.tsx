@@ -1,8 +1,8 @@
 "use client";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Github, ArrowRight, GitCommit, GitPullRequest, BookOpen, BarChart3, Hash } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Github, ArrowRight, GitCommit, GitPullRequest, BookOpen, BarChart3, Hash, ExternalLink } from "lucide-react";
 
 const DEMO_MATCHES = [
   {
@@ -143,6 +143,13 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* Onboarding hint */}
+        <div className="text-center mb-4 animate-fade-in">
+          <p className="text-xs text-[var(--muted)] font-mono">
+            ← Scroll to explore · Tab through demo matches →<span className="inline sm:hidden"> · Tap a match to view</span>
+          </p>
+        </div>
+
         {/* Demo — terminal-inspired issue feed */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] mb-24 overflow-hidden">
           <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
@@ -159,7 +166,17 @@ export default function LandingPage() {
             {DEMO_MATCHES.map((m, i) => (
               <div
                 key={i}
-                className="px-4 py-3.5 hover:bg-[var(--surface-2)] transition-colors"
+                tabIndex={0}
+                role="button"
+                aria-label={`Demo match: ${m.title} in ${m.repo}, ${m.score}% match`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    window.open(`https://github.com/${m.repo}`, '_blank', 'noopener');
+                  }
+                }}
+                onClick={() => window.open(`https://github.com/${m.repo}`, '_blank', 'noopener')}
+                className="px-4 py-3.5 hover:bg-[var(--surface-2)] transition-colors cursor-pointer group focus-visible:outline-2 focus-visible:outline-[var(--accent)] focus-visible:outline-offset-[-2px]"
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
                 <div className="flex items-start justify-between gap-4 mb-1">
@@ -188,6 +205,9 @@ export default function LandingPage() {
                   </span>
                   <span className="tag" style={{ background: "rgba(63,185,80,0.1)", color: "#3fb950", borderColor: "rgba(63,185,80,0.2)" }}>
                     {m.label}
+                  </span>
+                  <span className="ml-auto text-[10px] text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                    View <ExternalLink size={10} />
                   </span>
                 </div>
               </div>

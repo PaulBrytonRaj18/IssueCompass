@@ -52,7 +52,28 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${jetbrainsMono.variable} ${syne.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                var t = localStorage.getItem('ic-theme') || 'system';
+                var r = t === 'system'
+                  ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+                  : t;
+                document.documentElement.setAttribute('data-theme', r);
+              } catch(e) {}
+            })();
+          `,
+        }} />
+      </head>
       <body>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[var(--accent)] focus:text-black focus:text-sm focus:font-semibold"
+        >
+          Skip to main content
+        </a>
         <Providers>{children}</Providers>
         <Analytics />
       </body>

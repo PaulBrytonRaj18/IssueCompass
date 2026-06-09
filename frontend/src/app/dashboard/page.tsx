@@ -13,8 +13,10 @@ const SkillFingerprintPanel = dynamic(
   { ssr: false },
 );
 import { PageLoader } from "@/components/Spinner";
+import { SkeletonCard, SkeletonSidebar } from "@/components/SkeletonCard";
 import { useMatches, useTriggerIndex } from "@/lib/hooks/use-issues";
 import { useSyncUserToBackend } from "@/lib/hooks/use-auth";
+import { getAuthToken } from "@/lib/api";
 import { useAnalyzeProfile } from "@/lib/hooks/use-github";
 import type { MatchedIssue } from "@/lib/types";
 
@@ -64,7 +66,7 @@ export default function DashboardPage() {
     refetch: refetchMatches,
   } = useMatches(
     Object.keys(matchesParams).length > 1 ? matchesParams : undefined,
-    syncMutation.isSuccess
+    !!(getAuthToken() || syncMutation.isSuccess)
   );
 
   useEffect(() => {
@@ -144,7 +146,9 @@ export default function DashboardPage() {
                 </h2>
               </div>
 
-              {fingerprint ? (
+              {matchesLoading ? (
+                <SkeletonSidebar />
+              ) : fingerprint ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between px-1">
                     <span className="text-xs font-mono text-[var(--muted)]">
@@ -245,13 +249,11 @@ export default function DashboardPage() {
             )}
 
             {isInitialLoading && (
-              <PageLoader
-                message={
-                  analyzing
-                    ? "Analyzing your GitHub profile..."
-                    : "Loading your matches..."
-                }
-              />
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
             )}
 
             {!isInitialLoading && noMatches && !matchesError && (

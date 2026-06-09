@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useState, memo, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Github, LayoutDashboard, Bookmark, LogOut, User, Search, TrendingUp, Save, Shield } from "lucide-react";
+import { Github, LayoutDashboard, Bookmark, LogOut, User, Search, TrendingUp, Save, Shield, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={14} /> },
@@ -20,6 +21,7 @@ export const Navbar = memo(function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { resolved, toggle } = useTheme();
 
   const user = session?.user as { username?: string; avatarUrl?: string };
 
@@ -56,6 +58,14 @@ export const Navbar = memo(function Navbar() {
             </Link>
           ))}
         </nav>
+
+        <button
+          onClick={toggle}
+          aria-label={`Switch to ${resolved === "dark" ? "light" : "dark"} mode`}
+          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-colors"
+        >
+          {resolved === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
 
         {session && (
           <div className="relative">

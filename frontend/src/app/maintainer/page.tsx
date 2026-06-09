@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { PageLoader } from "@/components/Spinner";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
 import {
   useMaintainerOverview,
@@ -97,7 +98,19 @@ export default function MaintainerPage() {
     return (
       <>
         <Navbar />
-        <PageLoader message="Loading maintainer dashboard..." />
+        <div className="max-w-6xl mx-auto px-4 py-8 space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 animate-pulse">
+                <div className="h-3 w-20 rounded bg-[var(--surface-2)] mb-2" />
+                <div className="h-6 w-12 rounded bg-[var(--surface-2)]" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
       </>
     );
   }

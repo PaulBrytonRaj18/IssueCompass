@@ -7,6 +7,7 @@ import { Navbar } from "@/components/Navbar";
 import { IssueCard } from "@/components/IssueCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageLoader } from "@/components/Spinner";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { useTrending } from "@/lib/hooks/use-issues";
 import type { MatchedIssue } from "@/lib/types";
 
@@ -88,7 +89,11 @@ export default function TrendingPage() {
           </div>
         </div>
 
-        {isLoading && <PageLoader message="Fetching trending issues..." />}
+        {isLoading && (
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        )}
 
         {!isLoading && matches.length === 0 && (
           <EmptyState

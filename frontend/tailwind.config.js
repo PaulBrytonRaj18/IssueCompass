@@ -15,11 +15,21 @@ module.exports = {
       colors: {
         background: "var(--background)",
         surface: "var(--surface)",
+        "surface-2": "var(--surface-2)",
+        "surface-3": "var(--surface-3)",
         border: "var(--border)",
         accent: "var(--accent)",
         "accent-dim": "var(--accent-dim)",
+        "accent-hover": "var(--accent-hover)",
         muted: "var(--muted)",
         foreground: "var(--foreground)",
+        "foreground-dim": "var(--foreground-dim)",
+        danger: "var(--danger)",
+        warning: "var(--warning)",
+        success: "var(--success)",
+        "success-dim": "var(--success-dim)",
+        "danger-dim": "var(--danger-dim)",
+        "warning-dim": "var(--warning-dim)",
       },
       fontSize: {
         "2xs": ["0.625rem", { lineHeight: "1rem" }],
@@ -27,6 +37,7 @@ module.exports = {
       animation: {
         "fade-in": "fadeIn 0.4s ease forwards",
         "slide-up": "slideUp 0.4s ease forwards",
+        "slide-in-right": "slideInRight 0.35s ease forwards",
         pulse_slow: "pulse 3s ease-in-out infinite",
       },
       keyframes: {
