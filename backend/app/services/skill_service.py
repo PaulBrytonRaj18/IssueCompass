@@ -350,7 +350,7 @@ async def extract_required_skills(title: str, body: str, labels: List[str] | Non
     """
     if ai_service.AI_ENABLED:
         try:
-            ai_result = await ai_service.analyze_issue_with_ai(title, body, labels)
+            ai_result = await ai_service.analyze_issue_with_ai(title, body, labels or [])
         except Exception as e:
             logger.debug("AI issue analysis failed, falling back to regex: %s", e)
             ai_result = None

@@ -178,10 +178,10 @@ async def get_pool_status() -> dict:
     if "Pool" in poolclass and poolclass != "NullPool":
         return {
             "poolclass": poolclass,
-            "size": pool.size(),
-            "checked_in": pool.checkedin(),
-            "checked_out": pool.checkedout(),
-            "overflow": pool.overflow(),
+            "size": pool.size(),  # type: ignore[attr-defined]
+            "checked_in": pool.checkedin(),  # type: ignore[attr-defined]
+            "checked_out": pool.checkedout(),  # type: ignore[attr-defined]
+            "overflow": pool.overflow(),  # type: ignore[attr-defined]
             "status": "pooled",
         }
     return {"poolclass": "NullPool", "status": "no-pool"}
