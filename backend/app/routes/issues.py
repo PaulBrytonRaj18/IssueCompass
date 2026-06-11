@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy import and_, func, select
@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.core.ratelimit import limiter
 from app.core.utils import parse_dt
 from app.models.models import Issue, Repository, SavedIssue, User
-from app.routes.auth import get_current_user, get_optional_current_user
+from app.core.dependencies import get_current_user, get_optional_current_user
 from app.schemas.schemas import (
     IssueMatchResponse,
     IssuePublic,
@@ -27,6 +27,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/issues", tags=["issues"])
 
 
+def _to_repo_public(repo) -> RepositoryPublic:
+    if isinstance(repo, dict):
+        return RepositoryPublic.model_validate(repo)
+    return RepositoryPublic.model_validate(repo)
+
+
+def _to_issue_public(issue, repo=None) -> IssuePublic:
+    pub = IssuePublic.model_validate(issue)
+    if repo is not None:
+        pub.repository = _to_repo_public(repo)
+    return pub
+
+
 @router.get("/matches", response_model=IssueMatchResponse)
 async def get_matched_issues(
     request: Request,
@@ -34,7 +47,7 @@ async def get_matched_issues(
     language: Optional[str] = Query(None, description="Filter by language"),
     is_good_first_issue: Optional[bool] = Query(None, description="Filter by good first issue"),
     is_help_wanted: Optional[bool] = Query(None, description="Filter by help wanted"),
-    difficulty: Optional[str] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
+    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -60,49 +73,7 @@ async def get_matched_issues(
 
     matches = []
     for m in matches_raw:
-        issue = m["issue"]
-        repo = m["repository"]
-        if isinstance(issue, dict):
-            issue_pub = IssuePublic(
-                id=issue.get("id", 0),
-                github_id=issue.get("github_id", 0),
-                number=issue.get("number", 0),
-                title=issue.get("title", ""),
-                body=issue.get("body"),
-                html_url=issue.get("html_url", ""),
-                state=issue.get("state", "open"),
-                labels=issue.get("labels"),
-                is_good_first_issue=issue.get("is_good_first_issue", False),
-                is_help_wanted=issue.get("is_help_wanted", False),
-                required_skills=issue.get("required_skills"),
-                complexity_score=issue.get("complexity_score", 0.5),
-                comments=issue.get("comments", 0),
-                created_at=issue.get("created_at"),
-                repository=RepositoryPublic(
-                    id=repo.get("id", 0) if isinstance(repo, dict) else repo.id,
-                    full_name=repo["full_name"] if isinstance(repo, dict) else repo.full_name,
-                    name=repo["name"] if isinstance(repo, dict) else repo.name,
-                    description=repo.get("description") if isinstance(repo, dict) else repo.description,
-                    owner_login=repo["owner_login"] if isinstance(repo, dict) else repo.owner_login,
-                    html_url=repo["html_url"] if isinstance(repo, dict) else repo.html_url,
-                    stars=repo.get("stars", 0) if isinstance(repo, dict) else repo.stars,
-                    primary_language=repo.get("primary_language") if isinstance(repo, dict) else repo.primary_language,
-                    topics=repo.get("topics") if isinstance(repo, dict) else repo.topics,
-                ),
-            )
-        else:
-            issue_pub = IssuePublic.model_validate(issue)
-            issue_pub.repository = (
-                RepositoryPublic.model_validate(repo)
-                if hasattr(repo, "id")
-                else RepositoryPublic(
-                    id=0,
-                    full_name=repo.get("full_name", ""),
-                    name=repo.get("name", ""),
-                    owner_login=repo.get("owner_login", ""),
-                    html_url=repo.get("html_url", ""),
-                )
-            )
+        issue_pub = _to_issue_public(m["issue"], m["repository"])
 
         match_item = MatchedIssue(
             issue=issue_pub,
@@ -233,8 +204,8 @@ async def search_issues(
     request: Request,
     q: str = Query(..., min_length=1, description="Free-text search query"),
     language: Optional[str] = Query(None, description="Filter by language"),
-    difficulty: Optional[str] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
-    label: Optional[str] = Query(None, description="Filter by label: good_first, help_wanted"),
+    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
+    label: Optional[Literal["good_first", "help_wanted"]] = Query(None, description="Filter by label: good_first, help_wanted"),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -299,37 +270,9 @@ async def search_issues(
 
     matches = []
     for m in matches_raw:
-        issue = m["issue"]
-        repo = m["repository"]
         matches.append(
             MatchedIssue(
-                issue=IssuePublic(
-                    id=getattr(issue, "id", 0),
-                    github_id=getattr(issue, "github_id", 0),
-                    number=getattr(issue, "number", 0),
-                    title=issue.title,
-                    body=getattr(issue, "body", None),
-                    html_url=issue.html_url,
-                    state=getattr(issue, "state", "open"),
-                    labels=getattr(issue, "labels", []),
-                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
-                    is_help_wanted=getattr(issue, "is_help_wanted", False),
-                    required_skills=getattr(issue, "required_skills", None),
-                    complexity_score=getattr(issue, "complexity_score", 0.5),
-                    comments=getattr(issue, "comments", 0),
-                    created_at=getattr(issue, "created_at", None),
-                    repository=RepositoryPublic(
-                        id=getattr(repo, "id", 0),
-                        full_name=repo.full_name,
-                        name=getattr(repo, "name", ""),
-                        description=getattr(repo, "description", None),
-                        owner_login=repo.owner_login,
-                        html_url=repo.html_url,
-                        stars=getattr(repo, "stars", 0),
-                        primary_language=getattr(repo, "primary_language", None),
-                        topics=getattr(repo, "topics", None),
-                    ),
-                ),
+                issue=_to_issue_public(m["issue"], m["repository"]),
                 match_score=m["match_score"],
                 matching_skills=m["matching_skills"],
                 why_matched=m["why_matched"],
@@ -435,37 +378,9 @@ async def get_trending_issues(
 
     matches = []
     for m in matches_raw:
-        issue = m["issue"]
-        repo = m["repository"]
         matches.append(
             MatchedIssue(
-                issue=IssuePublic(
-                    id=getattr(issue, "id", 0),
-                    github_id=getattr(issue, "github_id", 0),
-                    number=getattr(issue, "number", 0),
-                    title=issue.title,
-                    body=getattr(issue, "body", None),
-                    html_url=issue.html_url,
-                    state=getattr(issue, "state", "open"),
-                    labels=getattr(issue, "labels", []),
-                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
-                    is_help_wanted=getattr(issue, "is_help_wanted", False),
-                    required_skills=getattr(issue, "required_skills", None),
-                    complexity_score=getattr(issue, "complexity_score", 0.5),
-                    comments=getattr(issue, "comments", 0),
-                    created_at=getattr(issue, "created_at", None),
-                    repository=RepositoryPublic(
-                        id=getattr(repo, "id", 0),
-                        full_name=repo.full_name,
-                        name=getattr(repo, "name", ""),
-                        description=getattr(repo, "description", None),
-                        owner_login=repo.owner_login,
-                        html_url=repo.html_url,
-                        stars=getattr(repo, "stars", 0),
-                        primary_language=getattr(repo, "primary_language", None),
-                        topics=getattr(repo, "topics", None),
-                    ),
-                ),
+                issue=_to_issue_public(m["issue"], m["repository"]),
                 match_score=m["match_score"],
                 matching_skills=m["matching_skills"],
                 why_matched=m["why_matched"],
@@ -483,8 +398,8 @@ async def smart_search_issues(
     request: Request,
     q: str = Query(..., min_length=1, description="Natural language search query"),
     language: Optional[str] = Query(None, description="Filter by language"),
-    difficulty: Optional[str] = Query(None, description="Filter by difficulty"),
-    label: Optional[str] = Query(None, description="Filter by label"),
+    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty"),
+    label: Optional[Literal["good_first", "help_wanted"]] = Query(None, description="Filter by label"),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     current_user: Optional[User] = Depends(get_optional_current_user),
@@ -511,37 +426,9 @@ async def smart_search_issues(
     )
     matches = []
     for m in matches_raw:
-        issue = m["issue"]
-        repo = m["repository"]
         matches.append(
             MatchedIssue(
-                issue=IssuePublic(
-                    id=getattr(issue, "id", 0),
-                    github_id=getattr(issue, "github_id", 0),
-                    number=getattr(issue, "number", 0),
-                    title=issue.title,
-                    body=getattr(issue, "body", None),
-                    html_url=issue.html_url,
-                    state=getattr(issue, "state", "open"),
-                    labels=getattr(issue, "labels", []),
-                    is_good_first_issue=getattr(issue, "is_good_first_issue", False),
-                    is_help_wanted=getattr(issue, "is_help_wanted", False),
-                    required_skills=getattr(issue, "required_skills", None),
-                    complexity_score=getattr(issue, "complexity_score", 0.5),
-                    comments=getattr(issue, "comments", 0),
-                    created_at=getattr(issue, "created_at", None),
-                    repository=RepositoryPublic(
-                        id=getattr(repo, "id", 0),
-                        full_name=repo.full_name,
-                        name=getattr(repo, "name", ""),
-                        description=getattr(repo, "description", None),
-                        owner_login=repo.owner_login,
-                        html_url=repo.html_url,
-                        stars=getattr(repo, "stars", 0),
-                        primary_language=getattr(repo, "primary_language", None),
-                        topics=getattr(repo, "topics", None),
-                    ),
-                ),
+                issue=_to_issue_public(m["issue"], m["repository"]),
                 match_score=m["match_score"],
                 matching_skills=m["matching_skills"],
                 why_matched=m["why_matched"],

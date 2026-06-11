@@ -7,6 +7,7 @@ from app.services import ai_service
 
 logger = logging.getLogger(__name__)
 
+# ── Composite score weights (must sum to 1.0) ─────────────────────
 SCORE_WEIGHTS = {
     "skill_match": 0.50,
     "popularity": 0.15,
@@ -15,24 +16,75 @@ SCORE_WEIGHTS = {
     "freshness": 0.10,
 }
 
+# ── Repo activity: star thresholds ────────────────────────────────
+STARS_VERY_HIGH = 10_000  # threshold for very popular repos
+STARS_HIGH = 1_000        # threshold for popular repos
+STARS_MEDIUM = 100        # threshold for moderately popular repos
+
+# ── Repo activity: days since last index ──────────────────────────
+DAYS_RECENT = 7      # indexed within a week
+DAYS_MONTH = 30      # indexed within a month
+
+# ── Repo activity: fork threshold ─────────────────────────────────
+FORKS_MODERATE = 100  # indicates moderate community engagement
+
+# ── Freshness: day ranges ─────────────────────────────────────────
+FRESH_DAYS = 7     # issue created within a week
+MODERATE_DAYS = 30 # issue created within a month
+STALE_DAYS = 90    # issue created within 3 months
+
+# ── Popularity: comment thresholds ────────────────────────────────
+COMMENTS_HIGH = 20   # many comments (high engagement)
+COMMENTS_MODERATE = 5  # some discussion
+COMMENTS_LOW = 0        # no comments (baseline)
+
+# ── Popularity: fork thresholds ───────────────────────────────────
+FORKS_HIGH = 1_000    # many forks (widespread interest)
+FORKS_MODERATE_POP = 100  # moderate forks
+
+# ── Popularity: star thresholds ───────────────────────────────────
+STARS_TOP = 10_000   # top-tier popularity
+STARS_ACTIVE = 1_000 # active popularity
+STARS_KNOWN = 100    # known repo
+STARS_MINIMAL = 10   # minimal popularity
+
+# ── Live issue scorer: label boost values ──────────────────────────
+LABEL_BOOST_GFI = 0.6  # "good first issue" increases match score
+LABEL_BOOST_HELP = 0.3 # "help wanted" increases match score
+LABEL_BOOST_BUG = 0.1  # "bug" label contributes slightly
+
+# ── Live issue scorer: freshness defaults ─────────────────────────
+FRESHNESS_DEFAULT = 0.2   # fallback when date is unparseable
+FRESHNESS_RECENT = 1.0    # ≤ 7 days
+FRESHNESS_MODERATE = 0.8  # ≤ 30 days
+FRESHNESS_STALE = 0.5     # ≤ 90 days
+
+# ── Explain-score quality thresholds ──────────────────────────────
+QUALITY_EXCELLENT = 0.8  # "Strong match" threshold
+QUALITY_GOOD = 0.5       # "Good match" threshold
+
+# ── Explain-score descriptor thresholds ───────────────────────────
+DESC_HIGH = 0.7   # "highly popular / very active / recently updated"
+DESC_MEDIUM = 0.4 # "popular / active" floor
+
 
 def compute_repo_activity_score(repo: Repository) -> float:
     score = 0.5
     if repo.is_archived:
         return 0.0
-    if repo.stars > 10000:
+    if repo.stars > STARS_VERY_HIGH:
         score += 0.2
-    elif repo.stars > 1000:
+    elif repo.stars > STARS_HIGH:
         score += 0.15
-    elif repo.stars > 100:
+    elif repo.stars > STARS_MEDIUM:
         score += 0.1
     if repo.last_indexed:
         days_since = (datetime.now(timezone.utc) - repo.last_indexed).days
-        if days_since < 7:
+        if days_since < DAYS_RECENT:
             score += 0.15
-        elif days_since < 30:
+        elif days_since < DAYS_MONTH:
             score += 0.1
-    if repo.forks > 100:
+    if repo.forks > FORKS_MODERATE:
         score += 0.1
     return min(score, 1.0)
 
@@ -41,34 +93,34 @@ def compute_freshness_score(issue: Issue) -> float:
     if not issue.created_at:
         return 0.3
     days_old = (datetime.now(timezone.utc) - issue.created_at).days
-    if days_old < 7:
+    if days_old < FRESH_DAYS:
         return 1.0
-    if days_old < 30:
+    if days_old < MODERATE_DAYS:
         return 0.8
-    if days_old < 90:
+    if days_old < STALE_DAYS:
         return 0.5
     return 0.2
 
 
 def compute_popularity_score(issue: Issue, repo: Repository) -> float:
     score = 0.0
-    if issue.comments > 20:
+    if issue.comments > COMMENTS_HIGH:
         score += 0.3
-    elif issue.comments > 5:
+    elif issue.comments > COMMENTS_MODERATE:
         score += 0.2
-    elif issue.comments > 0:
+    elif issue.comments > COMMENTS_LOW:
         score += 0.1
-    if repo.stars > 10000:
+    if repo.stars > STARS_TOP:
         score += 0.4
-    elif repo.stars > 1000:
+    elif repo.stars > STARS_ACTIVE:
         score += 0.3
-    elif repo.stars > 100:
+    elif repo.stars > STARS_KNOWN:
         score += 0.2
-    elif repo.stars > 10:
+    elif repo.stars > STARS_MINIMAL:
         score += 0.1
-    if repo.forks > 1000:
+    if repo.forks > FORKS_HIGH:
         score += 0.2
-    elif repo.forks > 100:
+    elif repo.forks > FORKS_MODERATE_POP:
         score += 0.1
     return min(score, 1.0)
 
@@ -86,13 +138,13 @@ def compute_interest_match(
     issue_labels = set(issue_skills.get("labels", []))
 
     if not user_langs and not user_topics:
-        return 0.3
+        return INTEREST_DEFAULT
 
     combined_user = user_langs | user_topics | user_cats | user_top
     combined_issue = issue_cats | issue_labels
 
     if not combined_issue:
-        return 0.3
+        return INTEREST_DEFAULT
 
     matches = len(combined_user & combined_issue)
     total = max(len(combined_user), 1)
@@ -150,9 +202,9 @@ def explain_score(
         popularity=popularity,
     )
 
-    if final > 0.8:
+    if final > QUALITY_EXCELLENT:
         parts.append("Strong match")
-    elif final > 0.5:
+    elif final > QUALITY_GOOD:
         parts.append("Good match")
     else:
         parts.append("Partial match")
@@ -165,17 +217,17 @@ def explain_score(
         parts.append(f"— your {skill_str} skills align")
 
     repo_desc: list[str] = []
-    if popularity > 0.7:
+    if popularity > DESC_HIGH:
         repo_desc.append("highly popular repo")
-    elif popularity > 0.4:
+    elif popularity > DESC_MEDIUM:
         repo_desc.append("popular repo")
 
-    if repo_activity > 0.7:
+    if repo_activity > DESC_HIGH:
         repo_desc.append("very active")
-    elif repo_activity > 0.4:
+    elif repo_activity > DESC_MEDIUM:
         repo_desc.append("active")
 
-    if freshness > 0.7:
+    if freshness > DESC_HIGH:
         repo_desc.append("recently updated")
 
     if repo_desc:
@@ -222,6 +274,47 @@ def safe_explain_score(
 # Called BEFORE the issue is embedded or persisted.
 # ---------------------------------------------------------------------------
 
+# ── Live issue scorer: sub-score weights ──────────────────────────
+WEIGHT_LANG = 0.40       # language match contribution
+WEIGHT_TOPIC = 0.20     # topic overlap contribution
+WEIGHT_LABEL = 0.15     # label match contribution
+WEIGHT_FRESHNESS = 0.15 # recency contribution
+WEIGHT_POP = 0.10       # popularity contribution
+
+# ── Live issue scorer: topic overlap multiplier ───────────────────
+TOPIC_OVERLAP_MULTIPLIER = 0.35  # each matching topic adds 0.35
+
+# ── Live issue scorer: language boost base ────────────────────────
+LANG_BOOST_BASE = 0.5  # base language match score before proficiency scaling
+
+# ── Live issue scorer: popularity thresholds (live) ──────────────
+LIVE_STARS_VERY_HIGH = 10_000  # very popular repo
+LIVE_STARS_HIGH = 1_000        # popular repo
+LIVE_STARS_MEDIUM = 100        # moderately popular
+
+# ── Live issue scorer: popularity increments ──────────────────────
+LIVE_POP_STARS_HIGH = 0.4   # very high stars contribution
+LIVE_POP_STARS_MEDIUM = 0.25 # high stars contribution
+LIVE_POP_STARS_LOW = 0.1    # moderate stars contribution
+LIVE_POP_FORKS_HIGH = 0.2   # many forks contribution
+LIVE_POP_FORKS_LOW = 0.1    # moderate forks contribution
+LIVE_POP_COMMENTS_HIGH = 0.3  # many comments contribution
+LIVE_POP_COMMENTS_LOW = 0.15  # some comments contribution
+
+# ── Live issue scorer: comment thresholds (live) ─────────────────
+LIVE_COMMENTS_HIGH = 20   # many comments
+LIVE_COMMENTS_MODERATE = 5  # some comments
+
+# ── Live issue scorer: fork thresholds (live) ────────────────────
+LIVE_FORKS_HIGH = 1_000  # many forks
+LIVE_FORKS_MODERATE = 100  # moderate forks
+LIVE_QUALITY_EXCELLENT = 0.8  # "Excellent" match threshold (live)
+LIVE_QUALITY_GOOD = 0.6       # "Good" match threshold (live)
+
+# ── Interest match defaults ──────────────────────────────────────
+INTEREST_DEFAULT = 0.3  # fallback when user or issue lacks skill data
+
+
 def score_live_issue(
     user_skills: dict,
     raw_issue: dict,
@@ -244,71 +337,71 @@ def score_live_issue(
     lang_score = 0.0
     if repo_language and repo_language in user_languages:
         lang_pct = user_skills.get("languages", {}).get(repo_language, 0)
-        lang_score = min(1.0, 0.5 + lang_pct * 0.5)
+        lang_score = min(1.0, LANG_BOOST_BASE + lang_pct * LANG_BOOST_BASE)
     elif repo_language:
         lang_score = 0.0
 
-    # ── 2. Topic / interest match (weight 0.20)
+    # ── 2. Topic / interest match
     topic_overlap = len(user_topics & repo_topics)
-    topic_score = min(1.0, topic_overlap * 0.35)
+    topic_score = min(1.0, topic_overlap * TOPIC_OVERLAP_MULTIPLIER)
 
-    # ── 3. Label match (weight 0.15)
+    # ── 3. Label match
     label_names = {lbl["name"].lower() for lbl in raw_issue.get("labels", [])}
     label_score = 0.0
     if "good first issue" in label_names:
-        label_score += 0.6
+        label_score += LABEL_BOOST_GFI
     if "help wanted" in label_names:
-        label_score += 0.3
+        label_score += LABEL_BOOST_HELP
     if "bug" in label_names:
-        label_score += 0.1
+        label_score += LABEL_BOOST_BUG
     label_score = min(1.0, label_score)
 
-    # ── 4. Freshness (weight 0.15)
+    # ── 4. Freshness
     updated_str = raw_issue.get("updated_at") or raw_issue.get("created_at", "")
-    freshness_score = 0.2
+    freshness_score = FRESHNESS_DEFAULT
     if updated_str:
         try:
             updated_dt = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
             age_days = (datetime.now(timezone.utc) - updated_dt).days
-            if age_days <= 7:
-                freshness_score = 1.0
-            elif age_days <= 30:
-                freshness_score = 0.8
-            elif age_days <= 90:
-                freshness_score = 0.5
+            if age_days <= FRESH_DAYS:
+                freshness_score = FRESHNESS_RECENT
+            elif age_days <= MODERATE_DAYS:
+                freshness_score = FRESHNESS_MODERATE
+            elif age_days <= STALE_DAYS:
+                freshness_score = FRESHNESS_STALE
             else:
-                freshness_score = 0.2
+                freshness_score = FRESHNESS_DEFAULT
         except (ValueError, TypeError):
-            freshness_score = 0.2
+            freshness_score = FRESHNESS_DEFAULT
 
-    # ── 5. Repo popularity (weight 0.10)
+    # ── 5. Repo popularity
     stars = raw_repo.get("stargazers_count") or raw_repo.get("stars", 0)
     forks = raw_repo.get("forks_count") or raw_repo.get("forks", 0)
     pop_score = 0.0
-    if stars >= 10_000:
-        pop_score += 0.4
-    elif stars >= 1_000:
-        pop_score += 0.25
-    elif stars >= 100:
-        pop_score += 0.1
-    if forks >= 1_000:
-        pop_score += 0.2
-    elif forks >= 100:
-        pop_score += 0.1
+    if stars >= LIVE_STARS_VERY_HIGH:
+        pop_score += LIVE_POP_STARS_HIGH
+    elif stars >= LIVE_STARS_HIGH:
+        pop_score += LIVE_POP_STARS_MEDIUM
+    elif stars >= LIVE_STARS_MEDIUM:
+        pop_score += LIVE_POP_STARS_LOW
+    if forks >= LIVE_FORKS_HIGH:
+        pop_score += LIVE_POP_FORKS_HIGH
+    elif forks >= LIVE_FORKS_MODERATE:
+        pop_score += LIVE_POP_FORKS_LOW
     comments = raw_issue.get("comments", 0)
-    if comments >= 20:
-        pop_score += 0.3
-    elif comments >= 5:
-        pop_score += 0.15
+    if comments >= LIVE_COMMENTS_HIGH:
+        pop_score += LIVE_POP_COMMENTS_HIGH
+    elif comments >= LIVE_COMMENTS_MODERATE:
+        pop_score += LIVE_POP_COMMENTS_LOW
     pop_score = min(1.0, pop_score)
 
     # ── Composite (weights must sum to 1.0)
     composite = (
-        lang_score    * 0.40 +
-        topic_score   * 0.20 +
-        label_score   * 0.15 +
-        freshness_score * 0.15 +
-        pop_score     * 0.10
+        lang_score    * WEIGHT_LANG +
+        topic_score   * WEIGHT_TOPIC +
+        label_score   * WEIGHT_LABEL +
+        freshness_score * WEIGHT_FRESHNESS +
+        pop_score     * WEIGHT_POP
     )
     return round(composite, 4)
 
@@ -329,7 +422,7 @@ def build_live_issue_explanation(
     stars = raw_repo.get("stargazers_count") or raw_repo.get("stars", 0)
     repo_name = raw_repo.get("full_name") or raw_repo.get("name", "")
 
-    quality = "Excellent" if score >= 0.8 else "Good" if score >= 0.6 else "Partial"
+    quality = "Excellent" if score >= LIVE_QUALITY_EXCELLENT else "Good" if score >= LIVE_QUALITY_GOOD else "Partial"
     return (
         f"{quality} match ({pct}%) — {lang} repo '{repo_name}' "
         f"[{label_str}], {stars:,} stars (live result)"

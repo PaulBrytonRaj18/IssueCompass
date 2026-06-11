@@ -34,7 +34,8 @@ async def startup(ctx):
 async def shutdown(ctx):
     logger.info("ARQ worker shutting down")
     await close_redis()
-    logger.info("DB: disposing engine (NullPool)")
+    from app.core.database import _pool_label
+    logger.info("DB: disposing engine (%s)", _pool_label)
     await db_engine.dispose()
 
 
@@ -285,14 +286,18 @@ async def index_issues_task(ctx: dict) -> None:
 
     logger.info("Indexing %d languages: %s", len(languages_to_index), languages_to_index)
 
-    # ── Index each (language, label) pair ────────────────────────────────────
-    for lang in languages_to_index:
-        for label in labels:
+    # ── Index each (language, label) pair in parallel (max 3 concurrent) ────
+    sem = asyncio.Semaphore(3)
+    async def run_with_limit(lang, label):
+        async with sem:
             try:
-                await index_language_issues(ctx, lang, label)
+                return await index_language_issues(ctx, lang, label)
             except Exception as exc:
                 logger.error("Failed to index lang=%s label=%s: %s", lang, label, exc)
-            await asyncio.sleep(0.5)
+                return None
+
+    tasks = [run_with_limit(lang, label) for lang in languages_to_index for label in labels]
+    await asyncio.gather(*tasks)
 
 
 async def cleanup_stale_issues_task(ctx: dict) -> None:

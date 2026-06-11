@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
+import sentry_sdk
 from app.core.config import get_settings
 from app.core.database import close_db, get_pool_status
 from app.core.monitoring import get_metrics, setup_monitoring
@@ -34,21 +35,38 @@ logger = logging.getLogger("issuecompass")
 
 settings = get_settings()
 
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment="production" if not settings.DEBUG else "development",
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("IssueCompass API starting up...")
 
-    logger.info(
-        "DB: using NullPool + stmt_cache=0 prep_stmt_cache=0 — "
-        "PgBouncer session pooler compatible"
-    )
+    from app.core.database import _pool_label, _use_queue
+    if _use_queue:
+        logger.info(
+            "DB: using %s + stmt_cache=0 — QueuePool with PgBouncer "
+            "transaction mode (set DB_POOL_SIZE=0 for NullPool compat)",
+            _pool_label,
+        )
+    else:
+        logger.info(
+            "DB: using NullPool + stmt_cache=0 — "
+            "PgBouncer session pooler compatible"
+        )
 
     config_errors = settings.check_errors()
     if config_errors:
         for err in config_errors:
             logger.error("CONFIG: %s", err)
-        logger.warning("CONFIG: %d issue(s) found", len(config_errors))
+        logger.error("CONFIG: %d fatal issue(s) — shutting down", len(config_errors))
+        raise SystemExit(1)
     else:
         logger.info("CONFIG: all checks passed")
 
@@ -131,8 +149,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+        "X-Metrics-Key",
+        "X-CSRF-Token",
+    ],
 )
 
 
@@ -216,13 +240,13 @@ async def health(request: Request):
 
 @app.get("/metrics")
 async def metrics(request: Request):
-    api_key = request.headers.get("X-Metrics-Key") or request.query_params.get("key")
+    api_key = request.headers.get("X-Metrics-Key")
     expected = settings.METRICS_API_KEY
     if expected and api_key != expected:
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=403,
-            content={"error": "Forbidden. Set X-Metrics-Key header or METRICS_API_KEY env var."},
+            content={"error": "Forbidden. Set X-Metrics-Key header."},
         )
     return {
         "requests": get_metrics(),

@@ -190,7 +190,10 @@ async def _call_groq(
         return content
 
 
-async def _parse_json_response(raw: str) -> Dict[str, Any]:
+async def _parse_json_response(raw: str | None) -> Dict[str, Any]:
+    if raw is None:
+        logger.warning("AI response was None (likely API error)")
+        return {}
     try:
         return json.loads(raw)
     except json.JSONDecodeError:

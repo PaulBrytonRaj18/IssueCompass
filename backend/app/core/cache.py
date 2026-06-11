@@ -222,17 +222,17 @@ def _refresh_in_background(key: str, ttl: int, fetcher: Callable) -> None:
             value = await fetcher()
             await cache_set(key, value, ttl=ttl)
             logger.debug("Cache refreshed early: %s", key)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Background cache refresh failed for %s: %s", key, exc)
 
     try:
         task = asyncio.create_task(_refresh())
         task.add_done_callback(lambda t: (
-            logger.warning("Background refresh %s failed: %s", key, t.exception())
+            logger.warning("Background refresh %s unhandled error: %s", key, t.exception())
             if t.exception() else None
         ))
-    except RuntimeError:
-        pass
+    except RuntimeError as exc:
+        logger.warning("Could not schedule background refresh for %s: %s", key, exc)
 
 
 async def cache_set(key: str, value: Any, ttl: int = 3600) -> bool:

@@ -165,3 +165,37 @@ class TestConvertRawIssueToMatchDict:
     def test_matching_skills_contains_overlap(self):
         d = matching_service._convert_raw_issue_to_match_dict(self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75)
         assert "go" in d["matching_skills"] or "cli" in d["matching_skills"]
+
+
+class TestFindMatchingSkills:
+    def test_returns_matching_skills(self):
+        user_skills = {
+            "languages": {"python": 0.8, "javascript": 0.2},
+            "topics": ["api", "web"],
+            "top_skills": ["fastapi"],
+        }
+        issue_skills = {
+            "categories": {"backend": ["python", "fastapi"], "frontend": ["react"]},
+        }
+        result = matching_service.find_matching_skills(user_skills, issue_skills)
+        assert "python" in result
+        assert "fastapi" in result
+
+    def test_returns_empty_when_no_overlap(self):
+        user_skills = {"languages": {"rust": 1.0}, "topics": [], "top_skills": []}
+        issue_skills = {"categories": {"frontend": ["react", "css"]}}
+        result = matching_service.find_matching_skills(user_skills, issue_skills)
+        assert result == []
+
+    def test_capped_at_five_skills(self):
+        user_skills = {
+            "languages": {f"lang{i}": 0.5 for i in range(10)},
+            "topics": [f"topic{i}" for i in range(10)],
+            "top_skills": [f"skill{i}" for i in range(10)],
+        }
+        issue_skills = {"categories": {"all": [f"lang{i}" for i in range(10)]}}
+        result = matching_service.find_matching_skills(user_skills, issue_skills)
+        assert len(result) <= 5
+
+    def test_empty_skills_returns_empty(self):
+        assert matching_service.find_matching_skills({}, {}) == []

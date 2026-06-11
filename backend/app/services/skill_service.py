@@ -231,9 +231,9 @@ def _skill_fingerprint_to_vector_hash(fingerprint: Dict[str, Any]) -> List[float
     return vector.tolist()
 
 
-def _issue_text_to_vector_hash(title: str, body: str, labels: List[str]) -> List[float]:
+def _issue_text_to_vector_hash(title: str | None, body: str | None, labels: List[str] | None) -> List[float]:
     """Hash-based fallback for issue text vectorization."""
-    combined_text = f"{title} {body} {' '.join(labels)}".lower()
+    combined_text = f"{title or ''} {body or ''} {' '.join(labels or [])}".lower()
     vector = np.zeros(SKILL_VECTOR_DIMS, dtype=np.float32)
     all_langs = [
         "python", "javascript", "typescript", "java", "go", "rust",
@@ -294,14 +294,14 @@ async def skill_fingerprint_to_vector(fingerprint: Dict[str, Any]) -> List[float
     return _skill_fingerprint_to_vector_hash(fingerprint)
 
 
-async def issue_text_to_vector(title: str, body: str, labels: List[str]) -> List[float]:
+async def issue_text_to_vector(title: str | None, body: str | None, labels: List[str] | None) -> List[float]:
     """
     Convert issue text to a skill vector for matching.
 
     Uses Jina AI embedding when available, falls back to hash-based vector.
     """
     if ai_service.EMBEDDINGS_ENABLED:
-        embed_text = f"{title}\n{body}\nLabels: {', '.join(labels)}"[:2000]
+        embed_text = f"{title or ''}\n{body or ''}\nLabels: {', '.join(labels or [])}"[:2000]
         if embed_text.strip():
             vector = await ai_service.generate_embedding(embed_text)
             if vector is not None:
@@ -310,8 +310,8 @@ async def issue_text_to_vector(title: str, body: str, labels: List[str]) -> List
     return _issue_text_to_vector_hash(title, body, labels)
 
 
-def _compute_complexity(title: str, body: str, labels: List[str]) -> float:
-    combined = f"{title} {body} {' '.join(labels)}".lower()
+def _compute_complexity(title: str, body: str, labels: List[str] | None) -> float:
+    combined = f"{title} {body} {' '.join(labels or [])}".lower()
 
     simple_indicators = [
         "beginner", "easy", "simple", "starter", "first", "good first",
@@ -343,7 +343,7 @@ def _compute_complexity(title: str, body: str, labels: List[str]) -> float:
     return 0.5
 
 
-async def extract_required_skills(title: str, body: str, labels: List[str]) -> Dict[str, Any]:
+async def extract_required_skills(title: str, body: str, labels: List[str] | None) -> Dict[str, Any]:
     """
     Extract required skills from issue text.
     Uses AI (Groq) when available, falls back to regex.
@@ -378,7 +378,7 @@ async def extract_required_skills(title: str, body: str, labels: List[str]) -> D
                 "issue_type": ai_result.get("issue_type", "other"),
             }
 
-    combined = f"{title} {body} {' '.join(labels)}".lower()
+    combined = f"{title or ''} {body or ''} {' '.join(labels or [])}".lower()
     detected: Dict[str, List[str]] = {}
     for category, keywords in SKILL_CATEGORIES.items():
         found = [kw for kw in keywords if kw in combined]

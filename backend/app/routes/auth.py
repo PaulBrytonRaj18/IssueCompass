@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import cache_delete, cache_get, cache_set
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.dependencies import _extract_token, get_current_user, get_optional_current_user
 from app.core.ratelimit import limiter
 from app.models.models import User
 from app.schemas.schemas import GitHubUserData, TokenResponse, UserPublic
@@ -25,28 +26,18 @@ class AuthStateResponse(BaseModel):
     state: str
 
 
-def _extract_token(request: Request) -> Optional[str]:
-    """Extract JWT from Authorization header (preferred) or cookie fallback.
-
-    The frontend sends Bearer tokens via `Authorization` header for API calls
-    and also receives the `ic_token` cookie for server-side middleware checks.
-    The header takes precedence when both are present.
-    """
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        return auth[7:]
-    return request.cookies.get(TOKEN_COOKIE_NAME)
-
-
-def _set_token_cookie(response: Response, token: str) -> None:
+def _set_token_cookie(response: Response, token: str, request: Request | None = None) -> None:
     max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    # Only set Secure if the request came over HTTPS.
+    # Browsers reject Secure cookies on http://localhost, which breaks local dev entirely.
+    is_secure = settings.COOKIE_SECURE and (request is None or request.url.scheme == "https")
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
         value=token,
         max_age=max_age,
         httponly=True,
         samesite="strict",
-        secure=settings.COOKIE_SECURE,
+        secure=is_secure,
         path="/",
     )
 
@@ -65,53 +56,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-
-async def get_current_user(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    token = _extract_token(request)
-    if not token:
-        raise credentials_exception
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id_raw = payload.get("sub")
-        if user_id_raw is None:
-            raise credentials_exception
-        user_id: int = int(user_id_raw)
-    except jwt.PyJWTError:
-        raise credentials_exception
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise credentials_exception
-    return user
-
-
-async def get_optional_current_user(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
-    token = _extract_token(request)
-    if not token:
-        return None
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id_raw = payload.get("sub")
-        if user_id_raw is None:
-            return None
-        user_id: int = int(user_id_raw)
-    except jwt.PyJWTError:
-        return None
-    result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
 
 
 @router.get("/state", response_model=AuthStateResponse)
@@ -197,7 +141,7 @@ async def github_callback(
         media_type="application/json",
         status_code=200,
     )
-    _set_token_cookie(response, access_token)
+    _set_token_cookie(response, access_token, request)
     return response
 
 
@@ -244,5 +188,5 @@ async def refresh_token(
         media_type="application/json",
         status_code=200,
     )
-    _set_token_cookie(response, new_token)
+    _set_token_cookie(response, new_token, request)
     return response

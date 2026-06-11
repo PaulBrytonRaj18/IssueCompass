@@ -113,7 +113,7 @@ async def check_auth() -> int:
 def check_pgbouncer() -> int:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from app.core.database import PGCONN_ARGS, engine
-    from sqlalchemy.pool import NullPool
+    from sqlalchemy.pool import NullPool, QueuePool
 
     errors = 0
 
@@ -131,16 +131,18 @@ def check_pgbouncer() -> int:
         _ok("pgbouncer", "prepared_statement_cache_size absent (correct — not a valid param)")
 
     pool = engine.pool
-    if not isinstance(pool, NullPool):
-        _fail("pgbouncer", f"poolclass={type(pool).__name__}, expected NullPool")
-        errors += 1
+    if isinstance(pool, NullPool):
+        _ok("pgbouncer", "poolclass=NullPool (session-mode PgBouncer)")
+    elif isinstance(pool, QueuePool):
+        _ok("pgbouncer", f"poolclass=QueuePool(size={pool.size()}, overflow={pool._max_overflow}) (transaction-mode PgBouncer)")
     else:
-        _ok("pgbouncer", "poolclass=NullPool")
+        _fail("pgbouncer", f"unexpected poolclass={type(pool).__name__}")
+        errors += 1
 
     return errors
 
 
-_EXPECTED_HEAD = "0003"
+_EXPECTED_HEAD = "0004"
 
 
 async def check_schema() -> int:
@@ -252,13 +254,17 @@ async def check_runtime() -> int:
         _fail("runtime.session", str(e))
         errors += 1
 
-    # ── Verify engine uses the expected PgBouncer-safe config ───────────
-    pool_name = type(engine.pool).__name__
-    if pool_name != "NullPool":
-        _fail("runtime.poolclass", f"expected NullPool, got {pool_name}")
-        errors += 1
+    # ── Verify engine uses a valid pool class ───────────────────────────
+    from sqlalchemy.pool import NullPool, QueuePool
+    pool = engine.pool
+    pool_name = type(pool).__name__
+    if isinstance(pool, NullPool):
+        _ok("runtime.poolclass", "NullPool (session-mode PgBouncer)")
+    elif isinstance(pool, QueuePool):
+        _ok("runtime.poolclass", f"QueuePool(size={pool.size()}, overflow={pool._max_overflow})")
     else:
-        _ok("runtime.poolclass", "NullPool")
+        _fail("runtime.poolclass", f"unexpected poolclass={pool_name}")
+        errors += 1
 
     ssl_val = PGCONN_ARGS.get("ssl", "not-set")
     _ok("runtime.ssl", f"ssl={ssl_val}")

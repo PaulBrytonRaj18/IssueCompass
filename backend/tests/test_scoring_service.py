@@ -279,3 +279,47 @@ class TestScoreLiveIssue:
         issue_no_date = {**self.BASE_ISSUE, "updated_at": None, "created_at": None}
         score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_no_date, self.BASE_REPO)
         assert 0.0 <= score <= 1.0
+
+
+# ── safe_explain_score ──────────────────────────────────────────────
+
+
+class TestSafeExplainScore:
+    def test_returns_string_with_none_inputs(self):
+        text = scoring_service.safe_explain_score(None, None, None, None, None, None)
+        assert isinstance(text, str)
+
+    def test_handles_partial_none_inputs(self):
+        text = scoring_service.safe_explain_score(0.5, None, 0.8, None, 0.3, ["python"])
+        assert isinstance(text, str)
+
+    def test_invalid_args_use_fallback(self):
+        text = scoring_service.safe_explain_score(
+            None, None, None, None, None, None,
+            fallback_score=0.9, issue_id=999,
+        )
+        assert isinstance(text, str)
+
+
+# ── build_live_issue_explanation ────────────────────────────────────
+
+
+class TestBuildLiveIssueExplanation:
+    def test_returns_string(self):
+        text = scoring_service.build_live_issue_explanation(
+            {"languages": {"python": 0.7}},
+            {"labels": [{"name": "bug"}], "pull_request": None},
+            {"language": "Python", "full_name": "org/repo", "stargazers_count": 100},
+            0.75,
+        )
+        assert isinstance(text, str)
+        assert "75" in text
+
+    def test_handles_missing_repo_name(self):
+        text = scoring_service.build_live_issue_explanation(
+            {"languages": {}},
+            {"labels": []},
+            {"language": None, "name": "repo", "stargazers_count": 0},
+            0.3,
+        )
+        assert isinstance(text, str)

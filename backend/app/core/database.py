@@ -1,15 +1,12 @@
 """
-Database connection architecture — Supabase Session Pooler.
+Database connection architecture.
 
-PgBouncer Session Pooling Notes:
-  asyncpg uses prepared statements internally. PgBouncer session-mode
-  pooling routes each transaction to a different backend connection, which
-  causes prepared statement conflicts (InvalidSQLStatementNameError and
-  DuplicatePreparedStatementError).
+Connection Pooling Strategy:
+  When DB_POOL_SIZE > 0: QueuePool (reuses connections, ~50ms faster/request).
+  When DB_POOL_SIZE = 0: NullPool  (PgBouncer session-mode compatibility).
 
-  Fix: set statement_cache_size=0 in connect_args to disable asyncpg's
-  prepared statement cache.  Pooling (QueuePool) cannot be used with
-  PgBouncer session pooling; poolclass=NullPool is mandatory.
+  statement_cache_size=0 is always set to disable asyncpg's prepared
+  statement cache, which conflicts with PgBouncer session-mode pooling.
 
   NOTE: "prepared_statement_cache_size" is NOT a valid asyncpg.connect()
   parameter in any version up to 0.29.x.  Only statement_cache_size exists.
@@ -33,7 +30,7 @@ DATABASE_URL = settings.DATABASE_URL
 if "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-# ── PgBouncer-safe connection arguments ────────────────────────────────
+# ── Connection arguments (PgBouncer-safe) ─────────────────────────────
 # statement_cache_size=0 disables asyncpg's prepared statement cache.
 # Without this, PgBouncer session pooling routes queries to different
 # backend connections, causing:
@@ -48,6 +45,30 @@ PGCONN_ARGS: dict = {
     "command_timeout": 30,
     "ssl": settings.DB_SSL_MODE,
 }
+
+# ── Pool class selection ──────────────────────────────────────────────
+# DB_POOL_SIZE > 0  → AsyncAdaptedQueuePool  (connection reuse, lower latency)
+# DB_POOL_SIZE = 0  → NullPool               (PgBouncer session-mode compatibility)
+#
+# SQLAlchemy's create_async_engine auto-selects AsyncAdaptedQueuePool
+# (the async-safe equivalent of QueuePool) when pool_size is provided.
+_pool_size = settings.DB_POOL_SIZE
+_use_queue = _pool_size > 0
+
+if _use_queue:
+    _poolclass = None  # auto: AsyncAdaptedQueuePool via pool_size kwarg
+    _pool_kwargs = {
+        "pool_size": _pool_size,
+        "max_overflow": settings.DB_POOL_OVERFLOW,
+        "pool_timeout": settings.DB_POOL_TIMEOUT,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
+    _pool_label = f"AsyncAdaptedQueuePool(size={_pool_size}, overflow={settings.DB_POOL_OVERFLOW})"
+else:
+    _poolclass = NullPool
+    _pool_kwargs = {"pool_pre_ping": True}
+    _pool_label = "NullPool"
 
 # ── DNS diagnostics at startup ───────────────────────────
 _db_host = (
@@ -90,18 +111,19 @@ def _mask_db_url(raw: str) -> str:
 asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
     "DB_ENGINE: creating async engine — target=%s asyncpg=%s "
-    "poolclass=NullPool stmt_cache=0 pre_ping=True",
+    "poolclass=%s stmt_cache=0",
     _mask_db_url(settings.DATABASE_URL),
     asyncpg_version,
+    _pool_label,
 )
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
-    poolclass=NullPool,
-    pool_pre_ping=True,
+    poolclass=_poolclass,
     connect_args=PGCONN_ARGS,
     isolation_level="READ_COMMITTED",
+    **_pool_kwargs,
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -145,12 +167,23 @@ async def get_db():
 
 
 async def close_db():
-    """Dispose of engine on shutdown — releases all connections to PgBouncer."""
+    """Dispose of engine on shutdown — releases all connections."""
     if engine is not None:
-        logger.info("DB_DISPOSE: disposing engine (NullPool)")
+        logger.info("DB_DISPOSE: disposing engine (%s)", _pool_label)
         await engine.dispose()
 
 
 async def get_pool_status() -> dict:
-    """Return pool status for health / metrics endpoints (NullPool = no pooling)."""
+    """Return pool status for health / metrics endpoints."""
+    pool = engine.pool
+    poolclass = type(pool).__name__
+    if "Pool" in poolclass and poolclass != "NullPool":
+        return {
+            "poolclass": poolclass,
+            "size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "status": "pooled",
+        }
     return {"poolclass": "NullPool", "status": "no-pool"}

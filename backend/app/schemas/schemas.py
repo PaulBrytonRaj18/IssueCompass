@@ -15,6 +15,8 @@ class GitHubUserData(BaseModel):
     public_repos: int = 0
     followers: int = 0
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -141,10 +143,14 @@ class SavedSearchCreate(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     notify: bool = False
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class SavedSearchUpdate(BaseModel):
     name: Optional[str] = None
     notify: Optional[bool] = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class SavedSearchPublic(BaseModel):

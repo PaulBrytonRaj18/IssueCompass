@@ -367,14 +367,14 @@ class TestMetricsEndpoint:
         with patch("main.settings.METRICS_API_KEY", "secret123"):
             from main import app
             with TestClient(app) as c:
-                resp = c.get("/metrics?key=secret123")
+                resp = c.get("/metrics", headers={"X-Metrics-Key": "secret123"})
                 assert resp.status_code == 200
 
     def test_metrics_with_wrong_key(self, client):
         with patch("main.settings.METRICS_API_KEY", "secret123"):
             from main import app
             with TestClient(app) as c:
-                resp = c.get("/metrics?key=wrong")
+                resp = c.get("/metrics", headers={"X-Metrics-Key": "wrong"})
                 assert resp.status_code == 403
 
 

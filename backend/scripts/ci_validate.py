@@ -150,14 +150,17 @@ async def check_async_engine() -> int:
         _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
         failed += 1
 
-    # Verify NullPool is used (PgBouncer-compatible)
+    # Verify pool class is compatible with PgBouncer
     try:
-        poolclass_name = type(engine.pool).__name__
-        if poolclass_name != "NullPool":
-            _fail("Pool class", f"expected NullPool, got {poolclass_name}")
-            failed += 1
+        from sqlalchemy.pool import NullPool, QueuePool
+        pool = engine.pool
+        if isinstance(pool, NullPool):
+            _ok("Pool class", "NullPool — session-mode PgBouncer")
+        elif isinstance(pool, QueuePool):
+            _ok("Pool class", f"QueuePool(size={pool.size()}) — transaction-mode PgBouncer")
         else:
-            _ok("Pool class", "NullPool — session pooler compatible")
+            _fail("Pool class", f"unexpected poolclass={type(pool).__name__}")
+            failed += 1
     except Exception as e:
         _fail("Pool class", str(e))
         failed += 1
@@ -173,12 +176,13 @@ async def check_async_engine() -> int:
         _fail("connectivity", f"SELECT 1 failed: {e}")
         failed += 1
 
-    # Test pool introspection — NullPool expected
+    # Test pool introspection
     try:
         status = await get_pool_status()
         assert isinstance(status, dict), f"expected dict, got {type(status)}"
-        assert status.get("poolclass") == "NullPool", f"expected NullPool, got {status}"
-        _ok("pool status", "NullPool — no pooling")
+        poolclass = status.get("poolclass", "unknown")
+        assert poolclass in ("QueuePool", "NullPool"), f"unexpected poolclass={poolclass}"
+        _ok("pool status", f"{poolclass} — {status.get('status', 'ok')}")
     except Exception as e:
         _fail("pool status", str(e))
         failed += 1

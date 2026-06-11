@@ -3,8 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from app.services.github_service import (
+    close_client,
     fetch_live_issues_for_user,
     fetch_user,
+    fetch_user_repos,
     search_issues_global,
 )
 
@@ -32,6 +34,36 @@ async def test_fetch_user_not_found():
     with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
         result = await fetch_user("nonexistent-user-that-does-not-exist")
         assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_user_returns_dict():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"X-RateLimit-Remaining": "100"}
+    mock_response.json = MagicMock(return_value={"login": "testuser", "id": 1, "public_repos": 5})
+
+    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+        result = await fetch_user("testuser")
+        assert result is not None
+        assert result["login"] == "testuser"
+
+
+@pytest.mark.asyncio
+async def test_fetch_user_repos_returns_list():
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"X-RateLimit-Remaining": "100"}
+    mock_response.json = MagicMock(return_value=[{"name": "repo1", "fork": False}])
+
+    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+        result = await fetch_user_repos("testuser")
+        assert isinstance(result, list)
+
+
+@pytest.mark.asyncio
+async def test_close_client_does_not_raise():
+    await close_client()
 
 
 class TestFetchLiveIssuesForUser:

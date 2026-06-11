@@ -37,12 +37,20 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://issuecompass:issuecompass@localhost:5432/issuecompass"
     DB_SSL_MODE: str = "require"
 
+    # Connection pool
+    # DB_POOL_SIZE=0  → NullPool (PgBouncer session-mode compatibility)
+    # DB_POOL_SIZE>0  → QueuePool (reuses connections, ~50ms faster per request)
+    # Requires PgBouncer in transaction mode when PgBouncer is used.
+    DB_POOL_SIZE: int = 20
+    DB_POOL_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_SOCKET_TIMEOUT: int = 3
     REDIS_SOCKET_CONNECT_TIMEOUT: int = 3
     REDIS_RETRY_ON_TIMEOUT: bool = True
-    REDIS_MAX_CONNECTIONS: int = 20
+    REDIS_MAX_CONNECTIONS: int = 50
     REDIS_PREFIX: str = "ic:"
 
     # GitHub
@@ -51,6 +59,9 @@ class Settings(BaseSettings):
     OAUTH_GITHUB_CLIENT_SECRET: str = ""
     GITHUB_API_BASE: str = "https://api.github.com"
     GITHUB_GRAPHQL_URL: str = "https://api.github.com/graphql"
+
+    # Sentry
+    SENTRY_DSN: str = ""
 
     # JWT
     SECRET_KEY: str = "change_this_in_production_use_random_string"
