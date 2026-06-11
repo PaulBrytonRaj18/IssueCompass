@@ -18,12 +18,12 @@ from slowapi.errors import RateLimitExceeded
 
 
 class JsonLogFormatter(jsonlogger.JsonFormatter):
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
-        log_record["timestamp"] = datetime.now(timezone.utc).isoformat()
-        log_record["level"] = record.levelname
-        if not log_record.get("name"):
-            log_record["name"] = record.name
+    def add_fields(self, log_data, record, message_dict):
+        super().add_fields(log_data, record, message_dict)
+        log_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+        log_data["level"] = record.levelname
+        if not log_data.get("name"):
+            log_data["name"] = record.name
 
 
 _handler = logging.StreamHandler()
