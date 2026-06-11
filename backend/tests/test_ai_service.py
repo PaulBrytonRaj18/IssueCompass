@@ -1,16 +1,13 @@
 """Tests for the AI service module with mocked external APIs."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from app.services.ai_service import (
-    AI_ENABLED,
-    EMBEDDINGS_ENABLED,
+    _cached_ai_call,
     _call_groq,
     _call_jina_embed,
-    _cached_ai_call,
     _parse_json_response,
     analyze_issue_with_ai,
     analyze_skills_with_ai,
@@ -136,7 +133,7 @@ async def test_cached_ai_call_dedup_in_flight():
     ):
         from app.services.ai_service import _in_flight
         _in_flight.clear()
-        r1, r2 = await _cached_ai_call("dedup", 3600, slow_factory), await _cached_ai_call("dedup", 3600, slow_factory)
+        await _cached_ai_call("dedup", 3600, slow_factory)
 
 
 # ── analyze_skills_with_ai ──────────────────────────────────────────

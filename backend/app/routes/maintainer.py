@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get, cache_set
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.core.ratelimit import limiter
 from app.models.models import Issue, Repository, User
-from app.core.dependencies import get_current_user
 from app.schemas.schemas import (
     ContributorMatch,
     IssuePublic,

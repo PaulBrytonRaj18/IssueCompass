@@ -1,5 +1,4 @@
 import pytest
-
 from app.services.skill_service import (
     _stable_hash,
     build_skill_fingerprint,

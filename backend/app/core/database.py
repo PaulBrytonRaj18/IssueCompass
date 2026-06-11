@@ -12,7 +12,6 @@ Connection Pooling Strategy:
   parameter in any version up to 0.29.x.  Only statement_cache_size exists.
 """
 
-import asyncio
 import logging
 import socket
 
@@ -20,6 +19,7 @@ import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
 
@@ -143,8 +143,6 @@ async def _enter_session(session):
     """Open session connection — extracted so tenacity can retry it."""
     await session.__aenter__()
 
-
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 _enter_session = retry(
     stop=stop_after_attempt(3),

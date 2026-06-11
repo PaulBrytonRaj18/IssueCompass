@@ -1,10 +1,9 @@
-import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 import sentry_sdk
+from app.core.cache import cache_ping, cache_stats, close_redis, init_redis
 from app.core.config import get_settings
 from app.core.database import close_db, get_pool_status
 from app.core.monitoring import get_metrics, setup_monitoring

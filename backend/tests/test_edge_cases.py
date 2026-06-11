@@ -1,11 +1,9 @@
 """Edge-case and boundary-value tests for all backend services."""
 
-import math
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.models.models import Issue, Repository
 from app.services import matching_service, scoring_service
 from app.services.search_service import (
@@ -19,7 +17,6 @@ from app.services.skill_service import (
     issue_text_to_vector,
     skill_fingerprint_to_vector,
 )
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # scoring_service edge cases

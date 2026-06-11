@@ -3,13 +3,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from app.worker import (
+    _parse_redis_url,
     cleanup_stale_issues_task,
     full_index,
     index_issues_task,
     index_language_issues,
-    _parse_redis_url,
     shutdown,
     startup,
 )

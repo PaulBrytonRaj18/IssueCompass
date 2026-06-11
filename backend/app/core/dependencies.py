@@ -5,7 +5,6 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import cache_delete, cache_get, cache_set
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User
