@@ -2,15 +2,14 @@
 import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search as SearchIcon, Filter, X, SlidersHorizontal, Bookmark, Sparkles } from "lucide-react";
+import { Search as SearchIcon, Filter, X, SlidersHorizontal, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { IssueCard } from "@/components/IssueCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageLoader } from "@/components/Spinner";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { useSmartSearch, useSearch } from "@/lib/hooks/use-issues";
-import { useSuggestions, useSaveSearch } from "@/lib/hooks/use-searches";
-import { MatchedIssue, SmartSearchResult, SuggestionItem } from "@/lib/types";
+import { MatchedIssue, SmartSearchResult } from "@/lib/types";
 
 const LANGUAGES = ["", "Python", "JavaScript", "TypeScript", "Go", "Rust", "Java", "Ruby", "PHP", "C++", "Swift", "Kotlin"];
 const DIFFICULTIES = [
@@ -45,15 +44,7 @@ function SearchPageContent() {
   const [searched, setSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [useSmartSearchBool, setUseSmartSearchBool] = useState(true);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveName, setSaveName] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suggestionRef = useRef<HTMLDivElement>(null);
-
-  const saveSearchMutation = useSaveSearch();
 
   const searchParamsRecord = useMemo(() => {
     if (!query.trim()) return null;
@@ -94,14 +85,6 @@ function SearchPageContent() {
   const results = useSmartSearchBool ? smartSearchResult.data : regularSearchResult.data;
   const isLoading = useSmartSearchBool ? smartSearchResult.isLoading : regularSearchResult.isLoading;
 
-  const suggestionsQuery = useSuggestions(debouncedQuery);
-
-  useEffect(() => {
-    if (suggestionsQuery.data?.suggestions) {
-      setShowSuggestions(suggestionsQuery.data.suggestions.length > 0);
-    }
-  }, [suggestionsQuery.data]);
-
   const performSearch = useCallback(() => {
     if (!query.trim()) return;
     setSearched(true);
@@ -111,7 +94,6 @@ function SearchPageContent() {
     if (difficulty) params.set("difficulty", difficulty);
     if (labelFilter) params.set("label", labelFilter);
     router.replace(`/search?${params.toString()}`, { scroll: false });
-    setShowSuggestions(false);
   }, [query, language, difficulty, labelFilter, router]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -121,40 +103,13 @@ function SearchPageContent() {
   const clearSearch = useCallback(() => {
     setQuery("");
     setSearched(false);
-    setDebouncedQuery("");
     inputRef.current?.focus();
     router.replace("/search", { scroll: false });
   }, [router]);
 
   const onQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setQuery(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQuery(val), 300);
+    setQuery(e.target.value);
   }, []);
-
-  const selectSuggestion = useCallback((item: SuggestionItem) => {
-    setQuery(item.text);
-    setShowSuggestions(false);
-    if (item.type === "language") {
-      setLanguage(item.text);
-    }
-  }, []);
-
-  const saveSearch = useCallback(async () => {
-    if (!saveName.trim()) return;
-    try {
-      await saveSearchMutation.mutateAsync({
-        name: saveName.trim(),
-        query: query,
-        filters: { language, difficulty, label: labelFilter },
-      });
-      setShowSaveDialog(false);
-      setSaveName("");
-    } catch {
-      /* ignore */
-    }
-  }, [saveName, query, language, difficulty, labelFilter, saveSearchMutation]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -169,22 +124,6 @@ function SearchPageContent() {
       setSearched(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
   }, []);
 
   if (status === "loading") return <PageLoader message="Loading..." />;
@@ -215,9 +154,7 @@ function SearchPageContent() {
               value={query}
               onChange={onQueryChange}
               onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (suggestionsQuery.data?.suggestions?.length > 0) setShowSuggestions(true);
-              }}
+
               placeholder='e.g. "beginner React issues" or "FastAPI backend bugs"'
               required
               minLength={2}
@@ -229,24 +166,6 @@ function SearchPageContent() {
               <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                 <X size={15} />
               </button>
-            )}
-
-            {showSuggestions && suggestionsQuery.data?.suggestions && (
-              <div ref={suggestionRef} className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg overflow-hidden animate-fade-in">
-                {suggestionsQuery.data.suggestions.map((s: SuggestionItem, i: number) => (
-                  <button
-                    key={i}
-                    onClick={() => selectSuggestion(s)}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--accent-dim)] transition-colors"
-                  >
-                    <SearchIcon size={13} className="text-[var(--muted)]" />
-                    <span className="text-[var(--foreground)] font-medium">{s.text}</span>
-                    {s.description && (
-                      <span className="text-[var(--muted)] text-xs ml-auto">{s.description}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
             )}
           </div>
 
@@ -332,72 +251,6 @@ function SearchPageContent() {
                 personalized
               </span>
             )}
-            <button
-              onClick={() => setShowSaveDialog(true)}
-              className="ml-auto px-2.5 py-1 rounded-md border border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--border-bright)] flex items-center gap-1 text-2xs"
-            >
-              <Bookmark size={11} />
-              Save
-            </button>
-          </div>
-        )}
-
-        {showSaveDialog && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Save search"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setShowSaveDialog(false);
-              if (e.key === "Tab") {
-                const els = e.currentTarget.querySelectorAll<HTMLElement>(
-                  'input, button, [tabindex]:not([tabindex="-1"])'
-                );
-                const first = els[0];
-                const last = els[els.length - 1];
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last?.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first?.focus();
-                }
-              }
-            }}
-          >
-            <div className="bg-[var(--surface)] rounded-lg p-6 w-96 border border-[var(--border)] shadow-xl">
-              <h3 className="font-semibold text-[var(--foreground)] mb-3">Save Search</h3>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (saveName.trim()) saveSearch();
-                }}
-              >
-                <input
-                  type="text"
-                  value={saveName}
-                  onChange={(e) => setSaveName(e.target.value)}
-                  placeholder="e.g. Daily React beginner issues"
-                  required
-                  maxLength={100}
-                  aria-label="Search name"
-                  className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] text-sm mb-4 focus:outline-none focus:border-[var(--accent)]"
-                  autoFocus
-                />
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShowSaveDialog(false)}
-                    className="px-3 py-2 rounded-md border border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
-                    Cancel
-                  </button>
-                  <button type="submit"
-                    disabled={!saveName.trim() || saveSearchMutation.isPending}
-                    className="px-3 py-2 rounded-md bg-[var(--accent)] text-black text-xs font-semibold hover:bg-[var(--accent)]/90 disabled:opacity-50">
-                    Save
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
 

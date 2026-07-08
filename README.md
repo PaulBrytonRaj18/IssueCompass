@@ -33,7 +33,7 @@ GitHub Login  →  Fetch repos & activity  →  Build skill vector  →  Semanti
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Frontend (Next.js)                          │
-│  Landing · Dashboard · Search · Trending · Saved · Maintainer       │
+│  Landing · Dashboard · Search · Trending · Saved                     │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │  HTTP / JSON
                            ▼
@@ -112,7 +112,7 @@ Uses slowapi with Redis for shared rate counters across all workers:
 ARQ (Redis-backed job queue) runs offline tasks:
 - `full_index` — Index all languages with "good first issue" + "help wanted" labels, then invalidates `trending:*` cache
 - `index_language_issues` — Fetch issues from GitHub for one language/label pair, upsert into DB with skill vectors
-- `check_saved_searches` — Periodically re-evaluate saved searches and log new results
+
 
 ### Graceful Degradation
 
@@ -215,18 +215,10 @@ All production endpoints under `/api/v1`:
 | `GET /issues/trending` | No | Trending issues |
 | `GET /issues/smart-search` | Optional | NL semantic search |
 | `GET /issues/stats` | No | Platform statistics |
-| `GET /searches/suggestions` | No | Autocomplete |
-| `POST /searches/save` | JWT | Save a search |
-| `GET /searches/` | JWT | List saved searches |
-| `GET /searches/{id}` | JWT | Get saved search |
-| `PUT /searches/{id}` | JWT | Update saved search |
-| `DELETE /searches/{id}` | JWT | Delete saved search |
-| `POST /searches/{id}/check` | JWT | Check for new results |
-| `GET /maintainer/overview` | JWT | Repos + issue stats |
-| `GET /maintainer/repos/{id}` | JWT | Repo detail + issues |
-| `GET /maintainer/repos/{id}/contributors` | JWT | Top contributor matches |
 
 ---
+
+
 
 ## Testing
 

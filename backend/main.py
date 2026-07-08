@@ -8,7 +8,7 @@ from app.core.config import get_settings
 from app.core.database import close_db, get_pool_status
 from app.core.monitoring import get_metrics, setup_monitoring
 from app.core.ratelimit import limiter
-from app.routes import auth, github, issues, maintainer, searches
+from app.routes import auth, github, issues
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -174,8 +174,6 @@ API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(github.router, prefix=API_PREFIX)
 app.include_router(issues.router, prefix=API_PREFIX)
-app.include_router(searches.router, prefix=API_PREFIX)
-app.include_router(maintainer.router, prefix=API_PREFIX)
 
 
 @app.get("/", include_in_schema=False)

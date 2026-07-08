@@ -50,21 +50,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let _refreshing = false;
-let _pendingRequests: Array<{
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}> = [];
-
-function _onRefreshed(token: string) {
-  _pendingRequests.forEach((p) => p.resolve(token));
-  _pendingRequests = [];
-}
-
-function _onRefreshFailed(err: unknown) {
-  _pendingRequests.forEach((p) => p.reject(err));
-  _pendingRequests = [];
-}
+let _refreshPromise: Promise<string> | null = null;
 
 api.interceptors.response.use(
   (response) => response,
@@ -80,40 +66,32 @@ api.interceptors.response.use(
     }
 
     if (status === 401 && !config?._retry && config?.url && !config.url.includes("/auth/refresh") && !config.url.includes("/auth/github/callback")) {
-      if (!_refreshing) {
-        _refreshing = true;
+      if (!_refreshPromise) {
         const oldToken = _authToken;
         setAuthToken(null);
-        try {
-          const refreshResp = await api.post("/auth/refresh");
-          const newToken: string = refreshResp.data.access_token;
-          setAuthToken(newToken);
-          _onRefreshed(newToken);
-          config._retry = true;
-          config.headers.Authorization = `Bearer ${newToken}`;
-          return api(config);
-        } catch (refreshError) {
-          _onRefreshFailed(refreshError);
-          setAuthToken(oldToken);
-          error.userMessage = "Your session has expired. Please sign in again.";
-          return Promise.reject(error);
-        } finally {
-          _refreshing = false;
-        }
-      } else {
-        return new Promise((resolve, reject) => {
-          _pendingRequests.push({
-            resolve: (token: string) => {
-              config._retry = true;
-              config.headers.Authorization = `Bearer ${token}`;
-              resolve(api(config));
-            },
-            reject: () => {
-              error.userMessage = "Your session has expired. Please sign in again.";
-              reject(error);
-            },
-          });
-        });
+        _refreshPromise = api.post("/auth/refresh").then(
+          (refreshResp) => {
+            const newToken: string = refreshResp.data.access_token;
+            setAuthToken(newToken);
+            return newToken;
+          },
+          (refreshError) => {
+            setAuthToken(oldToken);
+            throw refreshError;
+          }
+        );
+      }
+
+      try {
+        const newToken = await _refreshPromise;
+        config._retry = true;
+        config.headers.Authorization = `Bearer ${newToken}`;
+        return api(config);
+      } catch (refreshError) {
+        error.userMessage = "Your session has expired. Please sign in again.";
+        return Promise.reject(error);
+      } finally {
+        _refreshPromise = null;
       }
     }
 
@@ -232,48 +210,4 @@ export const issuesApi = {
     signal?: AbortSignal
   ) => api.get("/issues/smart-search", { params, signal }),
 };
-
-export const searchesApi = {
-  getSuggestions: (q: string, signal?: AbortSignal) =>
-    api.get("/searches/suggestions", { params: { q }, signal }),
-
-  saveSearch: (data: {
-    name: string;
-    query: string;
-    filters?: Record<string, unknown>;
-    notify?: boolean;
-  }) => api.post("/searches/save", data),
-
-  listSearches: (signal?: AbortSignal) =>
-    api.get("/searches/", { signal }),
-
-  getSearch: (id: number, signal?: AbortSignal) =>
-    api.get(`/searches/${id}`, { signal }),
-
-  updateSearch: (id: number, data: {
-    name?: string;
-    notify?: boolean;
-  }) => api.put(`/searches/${id}`, data),
-
-  deleteSearch: (id: number) =>
-    api.delete(`/searches/${id}`),
-
-  checkSearch: (id: number) =>
-    api.post(`/searches/${id}/check`),
-};
-
-export const maintainerApi = {
-  getOverview: (signal?: AbortSignal) =>
-    api.get("/maintainer/overview", { signal }),
-
-  getRepoDetail: (repoId: number, signal?: AbortSignal) =>
-    api.get(`/maintainer/repos/${repoId}`, { signal }),
-
-  getSuggestedContributors: (
-    repoId: number,
-    params?: { limit?: number },
-    signal?: AbortSignal
-  ) => api.get(`/maintainer/repos/${repoId}/contributors`, { params, signal }),
-};
-
 export default api;

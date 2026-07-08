@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 
 from arq import cron
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import close_redis, init_redis
 from app.core.config import get_settings
@@ -195,52 +194,6 @@ async def full_index(ctx, languages: Optional[list] = None):
     return {"total_indexed": total, "languages": languages}
 
 
-async def check_saved_searches(ctx):
-    """Periodically check saved searches for new issues."""
-    from sqlalchemy import select
-
-    from app.models.models import SavedSearch, User
-    from app.services import search_service
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(SavedSearch).where(SavedSearch.notify.is_(True))
-        )
-        searches = result.scalars().all()
-
-        checked = 0
-        for saved in searches:
-            user_result = await db.execute(
-                select(User).where(User.id == saved.user_id)
-            )
-            user = user_result.scalar_one_or_none()
-            if not user:
-                continue
-
-            results = await search_service.smart_search(
-                db=db, query=saved.query, user=user, limit=10, offset=0,
-            )
-
-            new_count = 0
-            if saved.last_checked_at:
-                new_count = sum(
-                    1 for r in results
-                    if r["issue"].created_at
-                    and r["issue"].created_at > saved.last_checked_at
-                )
-
-            saved.last_checked_at = datetime.now(timezone.utc)
-            if new_count > 0:
-                logger.info(
-                    "Saved search #%d '%s' has %d new results",
-                    saved.id, saved.name, new_count,
-                )
-            checked += 1
-
-        await db.commit()
-        return {"searches_checked": checked}
-
-
 async def index_issues_task(ctx: dict) -> None:
     """
     Background task: index open GitHub issues into the local DB.
@@ -255,49 +208,48 @@ async def index_issues_task(ctx: dict) -> None:
     ]
     labels = ["good first issue", "help wanted"]
 
-    db: AsyncSession = ctx["db"]
-
-    # ── Determine languages to crawl ─────────────────────────────────────────
-    try:
-        result = await db.execute(
-            text(
-                """
-                SELECT lang, COUNT(*) AS user_count
-                FROM (
-                    SELECT jsonb_object_keys(skill_json->'languages') AS lang
-                    FROM users
-                    WHERE skill_json IS NOT NULL
-                      AND skill_json != 'null'::jsonb
-                ) sub
-                GROUP BY lang
-                ORDER BY user_count DESC
-                LIMIT 12
-                """
+    async with AsyncSessionLocal() as db:
+        # ── Determine languages to crawl ─────────────────────────────────────────
+        try:
+            result = await db.execute(
+                text(
+                    """
+                    SELECT lang, COUNT(*) AS user_count
+                    FROM (
+                        SELECT jsonb_object_keys(skill_json->'languages') AS lang
+                        FROM users
+                        WHERE skill_json IS NOT NULL
+                          AND skill_json != 'null'::jsonb
+                    ) sub
+                    GROUP BY lang
+                    ORDER BY user_count DESC
+                    LIMIT 12
+                    """
+                )
             )
-        )
-        user_languages = [row[0].lower() for row in result.fetchall()]
-    except Exception as exc:
-        logger.warning("Could not query user languages, using base list: %s", exc)
-        user_languages = []
+            user_languages = [row[0].lower() for row in result.fetchall()]
+        except Exception as exc:
+            logger.warning("Could not query user languages, using base list: %s", exc)
+            user_languages = []
 
-    # Merge user languages with base list, user languages take priority
-    combined = list(dict.fromkeys(user_languages + base_languages))
-    languages_to_index = combined[:12]
+        # Merge user languages with base list, user languages take priority
+        combined = list(dict.fromkeys(user_languages + base_languages))
+        languages_to_index = combined[:12]
 
-    logger.info("Indexing %d languages: %s", len(languages_to_index), languages_to_index)
+        logger.info("Indexing %d languages: %s", len(languages_to_index), languages_to_index)
 
-    # ── Index each (language, label) pair in parallel (max 3 concurrent) ────
-    sem = asyncio.Semaphore(3)
-    async def run_with_limit(lang, label):
-        async with sem:
-            try:
-                return await index_language_issues(ctx, lang, label)
-            except Exception as exc:
-                logger.error("Failed to index lang=%s label=%s: %s", lang, label, exc)
-                return None
+        # ── Index each (language, label) pair in parallel (max 3 concurrent) ────
+        sem = asyncio.Semaphore(3)
+        async def run_with_limit(lang, label):
+            async with sem:
+                try:
+                    return await index_language_issues(ctx, lang, label)
+                except Exception as exc:
+                    logger.error("Failed to index lang=%s label=%s: %s", lang, label, exc)
+                    return None
 
-    tasks = [run_with_limit(lang, label) for lang in languages_to_index for label in labels]
-    await asyncio.gather(*tasks)
+        tasks = [run_with_limit(lang, label) for lang in languages_to_index for label in labels]
+        await asyncio.gather(*tasks)
 
 
 async def cleanup_stale_issues_task(ctx: dict) -> None:
@@ -307,24 +259,24 @@ async def cleanup_stale_issues_task(ctx: dict) -> None:
       - closed (state != 'open'), or
       - not updated in the last 30 days.
     """
-    db: AsyncSession = ctx["db"]
-    try:
-        result = await db.execute(
-            text(
-                """
-                DELETE FROM issues
-                WHERE state != 'open'
-                   OR updated_at < NOW() - INTERVAL '30 days'
-                RETURNING id
-                """
+    async with AsyncSessionLocal() as db:
+        try:
+            result = await db.execute(
+                text(
+                    """
+                    DELETE FROM issues
+                    WHERE state != 'open'
+                       OR updated_at < NOW() - INTERVAL '30 days'
+                    RETURNING id
+                    """
+                )
             )
-        )
-        deleted_count = len(result.fetchall())
-        await db.commit()
-        logger.info("Stale issue cleanup: removed %d issues", deleted_count)
-    except Exception as exc:
-        await db.rollback()
-        logger.error("Stale issue cleanup failed: %s", exc)
+            deleted_count = len(result.fetchall())
+            await db.commit()
+            logger.info("Stale issue cleanup: removed %d issues", deleted_count)
+        except Exception as exc:
+            await db.rollback()
+            logger.error("Stale issue cleanup failed: %s", exc)
 
 
 def _parse_redis_url(url: str) -> dict:
@@ -354,7 +306,7 @@ def _parse_redis_url(url: str) -> dict:
 
 class WorkerSettings:
     redis_settings = _parse_redis_url(settings.REDIS_URL)
-    functions = [full_index, index_language_issues, check_saved_searches, index_issues_task, cleanup_stale_issues_task]
+    functions = [full_index, index_language_issues, index_issues_task, cleanup_stale_issues_task]
     on_startup = startup
     on_shutdown = shutdown
     keep_result = 3600

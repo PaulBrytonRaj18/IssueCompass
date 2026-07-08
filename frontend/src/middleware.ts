@@ -6,8 +6,6 @@ const protectedRoutes = [
   "/profile",
   "/search",
   "/trending",
-  "/maintainer",
-  "/searches",
   "/saved",
 ];
 

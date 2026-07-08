@@ -79,28 +79,4 @@ export const cacheConfig = {
       gcTime: GC_TIMES.MEDIUM,
     },
   },
-  searches: {
-    list: {
-      staleTime: STALE_TIMES.MEDIUM,
-      gcTime: GC_TIMES.MEDIUM,
-    },
-    suggestions: {
-      staleTime: STALE_TIMES.MEDIUM,
-      gcTime: GC_TIMES.SHORT,
-    },
-  },
-  maintainer: {
-    overview: {
-      staleTime: STALE_TIMES.MEDIUM,
-      gcTime: GC_TIMES.MEDIUM,
-    },
-    repoDetail: {
-      staleTime: STALE_TIMES.MEDIUM,
-      gcTime: GC_TIMES.MEDIUM,
-    },
-    contributors: {
-      staleTime: STALE_TIMES.MEDIUM,
-      gcTime: GC_TIMES.MEDIUM,
-    },
-  },
 } as const;

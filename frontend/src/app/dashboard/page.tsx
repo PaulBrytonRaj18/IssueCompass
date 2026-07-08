@@ -65,7 +65,7 @@ export default function DashboardPage() {
     error: matchesError,
     refetch: refetchMatches,
   } = useMatches(
-    Object.keys(matchesParams).length > 1 ? matchesParams : undefined,
+    Object.keys(matchesParams).length > 0 ? matchesParams : undefined,
     !!(getAuthToken() || syncMutation.isSuccess)
   );
 
