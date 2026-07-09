@@ -10,19 +10,19 @@
 
                           │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 
-                          │  │  Landing /   │  │  Dashboard   │  │   Search     │  │   Trending   │  │
+                           │  │  Landing /   │  │  Dashboard   │  │   Trending   │  │    Saved     │  │
 
-                          │  │  page.tsx    │  │  page.tsx    │  │  page.tsx    │  │  page.tsx    │  │
+                           │  │  page.tsx    │  │  page.tsx    │  │  page.tsx    │  │  page.tsx    │  │
 
-                          │  └──────────────┘  └──────┬───────┘  └──────┬───────┘  └──────────────┘  │
+                           │  └──────────────┘  └──────┬───────┘  └──────────────┘  └──────────────┘  │
 
-                           │  ┌──────────────┐  ┌────────────────────────────┐                           │  │
+                           │  ┌──────────────┐  ┌──────┴───────┐                                       │  │
 
-                           │  │   Profile    │  │          Saved            │                           │  │
+                           │  │   Profile    │  │      Saved                                            │  │
 
-                           │  │  page.tsx    │  │        page.tsx           │                           │  │
+                           │  │  page.tsx    │  │     page.tsx                                          │  │
 
-                           │  └──────────────┘  └───────────────────────────┘                           │  │
+                           │  └──────────────┘  └──────────────────────────────────────────────────────┘  │
 
                           └──────────────────────────────────────────────────────────────────────────┘
 
@@ -52,7 +52,7 @@
 
 ┃  │  ┌────────────────────────────────────────────────────────────────────────────────────────┐  │  ┃
 
-┃  │  │  protectedRoutes: /dashboard /profile /search /trending /saved                           │  │  ┃
+┃  │  │  protectedRoutes: /dashboard /profile /trending /saved                           │  │  ┃
 
 ┃  │  │  Auth check: ic_token cookie || next-auth.session-token → allow → else redirect /      │  │  ┃
 

@@ -33,7 +33,7 @@ GitHub Login  →  Fetch repos & activity  →  Build skill vector  →  Semanti
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Frontend (Next.js)                          │
-│  Landing · Dashboard · Search · Trending · Saved                     │
+│  Landing · Dashboard · Trending · Saved                              │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │  HTTP / JSON
                            ▼

@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Filter, RefreshCw, Zap, AlertCircle } from "lucide-react";
+import { Filter, RefreshCw, Zap, AlertCircle, Search, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Navbar } from "@/components/Navbar";
 import { IssueCard } from "@/components/IssueCard";
@@ -14,11 +14,11 @@ const SkillFingerprintPanel = dynamic(
 );
 import { PageLoader } from "@/components/Spinner";
 import { SkeletonCard, SkeletonSidebar } from "@/components/SkeletonCard";
-import { useMatches, useTriggerIndex } from "@/lib/hooks/use-issues";
+import { useMatches, useTriggerIndex, useSmartSearch } from "@/lib/hooks/use-issues";
 import { useSyncUserToBackend } from "@/lib/hooks/use-auth";
 import { getAuthToken } from "@/lib/api";
 import { useAnalyzeProfile } from "@/lib/hooks/use-github";
-import type { MatchedIssue } from "@/lib/types";
+import type { MatchedIssue, SmartSearchResult } from "@/lib/types";
 
 const LANGUAGES = [
   "All", "Python", "JavaScript", "TypeScript", "Go", "Rust", "Java", "Ruby", "PHP",
@@ -47,6 +47,29 @@ export default function DashboardPage() {
     publicRepos?: number;
     followers?: number;
   };
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchActive, setSearchActive] = useState(false);
+
+  const searchParams = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    return { q: searchQuery.trim(), limit: 30 };
+  }, [searchQuery]);
+
+  const smartSearchQuery = useSmartSearch(searchActive ? searchParams : null);
+  const searchResults = smartSearchQuery.data as SmartSearchResult | null;
+  const searchMatches = searchResults?.matches ?? [];
+  const isLoadingSearch = smartSearchQuery.isLoading;
+
+  const handleSearch = useCallback(() => {
+    if (!searchQuery.trim()) return;
+    setSearchActive(true);
+  }, [searchQuery]);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchActive(false);
+  }, []);
 
   const syncMutation = useSyncUserToBackend();
   const analyzeMutation = useAnalyzeProfile();
@@ -204,6 +227,56 @@ export default function DashboardPage() {
               </button>
             </div>
 
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex-1 relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearch();
+                  }}
+                  placeholder="Search the Issue you are Interested in..."
+                  minLength={2}
+                  maxLength={200}
+                  aria-label="Search issues"
+                  className="w-full pl-9 pr-9 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-dim)] transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={handleSearch}
+                disabled={!searchQuery.trim() || isLoadingSearch}
+                className="px-4 py-2.5 rounded-lg bg-[var(--accent)] text-black text-sm font-semibold hover:bg-[var(--accent)]/90 transition-colors disabled:opacity-50"
+              >
+                {isLoadingSearch ? "Searching..." : "Search"}
+              </button>
+            </div>
+
+            {searchActive && (
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={clearSearch}
+                  className="text-xs text-[var(--accent)] hover:underline"
+                >
+                  &larr; Back to Matches
+                </button>
+                {searchResults && (
+                  <span className="text-xs text-[var(--muted)] font-mono">
+                    {searchResults.total} results for &ldquo;{searchResults.query}&rdquo;
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 mb-5">
               <Filter size={12} className="text-[var(--muted)]" />
               <div className="flex items-center gap-1 flex-wrap">
@@ -234,58 +307,79 @@ export default function DashboardPage() {
               </select>
             </div>
 
-            {matchesError && (
-              <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--danger)] bg-[rgba(248,81,73,0.06)] mb-5">
-                <AlertCircle size={15} className="text-[var(--danger)] flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-[var(--danger)] font-medium">
-                    Connection Error
-                  </p>
-                  <p className="text-xs text-[var(--muted)] mt-0.5">
-                    Failed to load matches. Make sure the backend is running.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {isInitialLoading && (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </div>
-            )}
-
-            {!isInitialLoading && noMatches && !matchesError && (
-              <EmptyState
-                icon={<Zap size={20} />}
-                title={noSkills ? "Building your fingerprint" : "No matches yet"}
-                description={
-                  noSkills
-                    ? "We're analyzing your GitHub repos. This takes a few seconds."
-                    : "No indexed issues match your skills yet. Try triggering an index or adjusting filters."
-                }
-                action={
-                  <button
-                    onClick={async () => {
-                      await indexMutation.mutateAsync(undefined);
-                      setTimeout(() => refetchMatches(), 3000);
-                    }}
-                    disabled={indexMutation.isPending}
-                    className="px-5 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold disabled:opacity-60"
-                  >
-                    {indexMutation.isPending ? "Indexing..." : "Index Issues Now"}
-                  </button>
-                }
-              />
-            )}
-
-            {!noMatches && (
-              <div className="space-y-3">
-                {matches.map((match: MatchedIssue, i: number) => (
-                  <IssueCard key={match.issue.id} match={match} index={i} />
-                ))}
-              </div>
+            {searchActive ? (
+              <>
+                {isLoadingSearch && (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+                  </div>
+                )}
+                {!isLoadingSearch && searchMatches.length === 0 && (
+                  <EmptyState
+                    icon={<Search size={20} />}
+                    title="No results found"
+                    description={`No results for "${searchQuery}". Try different keywords.`}
+                  />
+                )}
+                {!isLoadingSearch && searchMatches.length > 0 && (
+                  <div className="space-y-3">
+                    {searchMatches.map((match: MatchedIssue, i: number) => (
+                      <IssueCard key={`${match.issue.id}-${i}`} match={match} index={i} />
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {matchesError && (
+                  <div className="flex items-center gap-3 p-4 rounded-lg border border-[var(--danger)] bg-[rgba(248,81,73,0.06)] mb-5">
+                    <AlertCircle size={15} className="text-[var(--danger)] flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-[var(--danger)] font-medium">
+                        Connection Error
+                      </p>
+                      <p className="text-xs text-[var(--muted)] mt-0.5">
+                        Failed to load matches. Make sure the backend is running.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {isInitialLoading && (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+                  </div>
+                )}
+                {!isInitialLoading && noMatches && !matchesError && (
+                  <EmptyState
+                    icon={<Zap size={20} />}
+                    title={noSkills ? "Building your fingerprint" : "No matches yet"}
+                    description={
+                      noSkills
+                        ? "We're analyzing your GitHub repos. This takes a few seconds."
+                        : "No indexed issues match your skills yet. Try triggering an index or adjusting filters."
+                    }
+                    action={
+                      <button
+                        onClick={async () => {
+                          await indexMutation.mutateAsync(undefined);
+                          setTimeout(() => refetchMatches(), 3000);
+                        }}
+                        disabled={indexMutation.isPending}
+                        className="px-5 py-2 rounded-md bg-[var(--accent)] text-black text-sm font-semibold disabled:opacity-60"
+                      >
+                        {indexMutation.isPending ? "Indexing..." : "Index Issues Now"}
+                      </button>
+                    }
+                  />
+                )}
+                {!noMatches && (
+                  <div className="space-y-3">
+                    {matches.map((match: MatchedIssue, i: number) => (
+                      <IssueCard key={match.issue.id} match={match} index={i} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </main>
         </div>

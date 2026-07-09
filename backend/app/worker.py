@@ -6,7 +6,6 @@ Or via:    python -m app.worker
 
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 

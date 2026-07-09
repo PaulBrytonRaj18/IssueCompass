@@ -4,12 +4,11 @@ import Image from "next/image";
 import { useState, memo, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { Github, LayoutDashboard, Bookmark, LogOut, User, Search, TrendingUp, Sun, Moon } from "lucide-react";
+import { Github, LayoutDashboard, Bookmark, LogOut, User, TrendingUp, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={14} /> },
-  { href: "/search", label: "Search", icon: <Search size={14} /> },
   { href: "/trending", label: "Trending", icon: <TrendingUp size={14} /> },
   { href: "/saved", label: "Saved", icon: <Bookmark size={14} /> },
   { href: "/profile", label: "Profile", icon: <User size={14} /> },
