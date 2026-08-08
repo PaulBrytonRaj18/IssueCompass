@@ -13,7 +13,7 @@ services:
     expose:
       - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U issuecompass"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-issuecompass}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -70,7 +70,7 @@ services:
       METRICS_API_KEY: ${METRICS_API_KEY:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
-      - "8000:8000"
+      - "8000:8080"
     networks:
       - internal
     deploy:
@@ -85,6 +85,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     container_name: issuecompass_frontend
     restart: unless-stopped
     depends_on:
@@ -95,7 +97,7 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       OAUTH_GITHUB_CLIENT_ID: ${OAUTH_GITHUB_CLIENT_ID}
       OAUTH_GITHUB_CLIENT_SECRET: ${OAUTH_GITHUB_CLIENT_SECRET}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
       - "3000:8080"
     networks:
