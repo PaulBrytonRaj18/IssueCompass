@@ -16,7 +16,6 @@ from app.schemas.schemas import (
     IssuePublic,
     MatchedIssue,
     RepositoryPublic,
-    SearchResult,
     SmartSearchResult,
     TrendingResult,
 )
@@ -196,92 +195,6 @@ async def get_saved_issues(
             )
         )
     return issues
-
-
-@router.get("/search", response_model=SearchResult)
-@limiter.limit("30/minute")
-async def search_issues(
-    request: Request,
-    q: str = Query(..., min_length=1, description="Free-text search query"),
-    language: Optional[str] = Query(None, description="Filter by language"),
-    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
-    label: Optional[Literal["good_first", "help_wanted"]] = Query(None, description="Filter by label: good_first, help_wanted"),
-    limit: int = Query(30, le=100),
-    offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
-):
-    """Search indexed issues by keyword with filters. Falls back to GitHub API if local results are sparse. Cached 30 minutes."""
-    cache_key = f"search:{q}:{language or ''}:{difficulty or ''}:{label or ''}:{limit}:{offset}"
-
-    cached = await cache_get(cache_key)
-    if cached:
-        return SearchResult(**cached)
-
-    matches_raw = await matching_service.search_issues_keyword(
-        db=db,
-        query=q,
-        language_filter=language,
-        difficulty=difficulty,
-        label_filter=label,
-        limit=limit,
-        offset=offset,
-    )
-
-    if len(matches_raw) < 5:
-        github_results = await github_service.search_issues_free_text(
-            query=q, language=language, per_page=limit
-        )
-        github_items = github_results.get("items", [])
-        existing_ids = {m["issue"].github_id for m in matches_raw}
-
-        for item in github_items:
-            if item["id"] in existing_ids:
-                continue
-            repo_data = item.get("repository") or {}
-            matches_raw.append({
-                "issue": Issue(
-                    github_id=item["id"],
-                    number=item["number"],
-                    title=item.get("title", ""),
-                    body=(item.get("body") or "")[:2000],
-                    html_url=item["html_url"],
-                    state="open",
-                    labels=[lb["name"] for lb in item.get("labels", [])],
-                    is_good_first_issue=any("good first" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                    is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                    comments=item.get("comments", 0),
-                    created_at=parse_dt(item.get("created_at")),
-                    updated_at=parse_dt(item.get("updated_at")),
-                    complexity_score=0.5,
-                ),
-                "repository": Repository(
-                    full_name=repo_data.get("full_name", ""),
-                    name=(repo_data.get("full_name") or "").split("/")[-1],
-                    owner_login=(repo_data.get("full_name") or "").split("/")[0] if repo_data.get("full_name") else "",
-                    html_url=repo_data.get("html_url", ""),
-                    stars=repo_data.get("stargazers_count", 0),
-                    primary_language=repo_data.get("language"),
-                    description=repo_data.get("description"),
-                ),
-                "match_score": 0.5,
-                "matching_skills": [],
-                "why_matched": f"GitHub result for: {q}",
-            })
-
-    matches = []
-    for m in matches_raw:
-        matches.append(
-            MatchedIssue(
-                issue=_to_issue_public(m["issue"], m["repository"]),
-                match_score=m["match_score"],
-                matching_skills=m["matching_skills"],
-                why_matched=m["why_matched"],
-            )
-        )
-
-    result = SearchResult(matches=matches, total=len(matches), query=q)
-    await cache_set(cache_key, result.model_dump(), ttl=1800)
-    return result
 
 
 @router.get("/trending", response_model=TrendingResult)

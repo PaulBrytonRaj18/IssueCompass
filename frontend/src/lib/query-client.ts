@@ -62,10 +62,6 @@ export const cacheConfig = {
       staleTime: STALE_TIMES.SHORT,
       gcTime: GC_TIMES.MEDIUM,
     },
-    search: {
-      staleTime: STALE_TIMES.SHORT,
-      gcTime: GC_TIMES.MEDIUM,
-    },
     smartSearch: {
       staleTime: STALE_TIMES.SHORT,
       gcTime: GC_TIMES.MEDIUM,

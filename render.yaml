@@ -60,6 +60,38 @@ services:
       - key: FRONTEND_URL
         sync: false
 
+  # ─── ARQ Background Worker ───────────────────────────────────
+  # Runs scheduled cron jobs defined in app.worker.WorkerSettings:
+  #   - index_issues_task: every 6h, populates the issues table
+  #   - cleanup_stale_issues_task: daily, prunes closed/stale issues
+  # Render `background` services have no PORT and no health check.
+  - type: worker
+    name: openissue-worker
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: arq app.worker.WorkerSettings
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: AI_ENABLED
+        value: "true"
+      - key: EMBEDDINGS_ENABLED
+        value: "true"
+      - key: DB_POOL_SIZE
+        value: "0"
+      - key: REDIS_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
+
   # ─── Next.js Frontend ───────────────────────────────────────
   - type: web
     name: openissue-frontend

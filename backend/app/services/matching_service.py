@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_get, cache_set
@@ -542,80 +542,3 @@ def _repo_orm_to_dict(repo: Repository) -> dict:
         "primary_language": repo.primary_language,
         "topics": repo.topics,
     }
-
-
-def _keyword_score(user_skills: Dict[str, Any], issue: Issue) -> float:
-    user_langs = set(user_skills.get("languages", {}).keys())
-    user_topics = set(user_skills.get("topics", []))
-    all_user_skills = user_langs | user_topics
-
-    issue_text = f"{issue.title or ''} {issue.body or ''}".lower()
-    issue_labels = [lb.lower() for lb in (issue.labels or [])]
-
-    matches = sum(
-        1 for skill in all_user_skills
-        if skill in issue_text or any(skill in lbl for lbl in issue_labels)
-    )
-
-    total = max(len(all_user_skills), 1)
-    return min(matches / total, 1.0)
-
-
-async def search_issues_keyword(
-    db: AsyncSession,
-    query: str,
-    language_filter: Optional[str] = None,
-    difficulty: Optional[str] = None,
-    label_filter: Optional[str] = None,
-    limit: int = 30,
-    offset: int = 0,
-) -> List[Dict[str, Any]]:
-    conditions = [Issue.state == "open"]
-
-    if query:
-        like_pattern = f"%{query}%"
-        conditions.append(
-            or_(
-                Issue.title.ilike(like_pattern),
-                Issue.body.ilike(like_pattern),
-            )
-        )
-
-    if language_filter:
-        conditions.append(Repository.primary_language.ilike(language_filter))
-
-    if difficulty == "beginner":
-        conditions.append(Issue.complexity_score < 0.35)
-    elif difficulty == "intermediate":
-        conditions.append(Issue.complexity_score.between(0.35, 0.65))
-    elif difficulty == "advanced":
-        conditions.append(Issue.complexity_score > 0.65)
-
-    if label_filter == "good_first":
-        conditions.append(Issue.is_good_first_issue.is_(True))
-    elif label_filter == "help_wanted":
-        conditions.append(Issue.is_help_wanted.is_(True))
-
-    query_stmt = (
-        select(Issue, Repository)
-        .join(Repository, Issue.repository_id == Repository.id)
-        .where(and_(*conditions))
-        .order_by(Issue.updated_at.desc().nullslast())
-        .offset(offset)
-        .limit(limit)
-    )
-
-    result = await db.execute(query_stmt)
-    rows = result.fetchall()
-
-    scored = []
-    for issue, repo in rows:
-        scored.append({
-            "issue": issue,
-            "repository": repo,
-            "match_score": 0.5,
-            "matching_skills": [],
-            "why_matched": f"Matched your search: {query}" if query else "All open issues",
-        })
-
-    return scored

@@ -30,16 +30,16 @@ ENV PYTHONUNBUFFERED=1 \
 
 COPY . .
 
-EXPOSE 8080
+EXPOSE 8000
 
 USER app
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import http.client; conn=http.client.HTTPConnection('localhost', ${PORT:-8080}); conn.request('GET', '/health'); resp=conn.getresponse(); exit(0 if resp.status==200 else 1)"
+    CMD python -c "import http.client; conn=http.client.HTTPConnection('localhost', ${PORT:-8000}); conn.request('GET', '/health'); resp=conn.getresponse(); exit(0 if resp.status==200 else 1)"
 
 CMD python -m scripts.db_reconcile 2>&1 && alembic upgrade head 2>&1 && exec gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:${PORT:-8080} \
+    --bind 0.0.0.0:${PORT:-8000} \
     --workers ${WEB_CONCURRENCY:-2} \
     --max-requests 1000 \
     --max-requests-jitter 50 \

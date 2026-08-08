@@ -48,6 +48,12 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # PORT must match the container port in the `ports` mapping below and the
+      # NEXT_PUBLIC_API_URL used by the frontend (http://backend:8000).
+      # Render injects its own PORT at runtime; compose sets it explicitly here
+      # so the container listens on 8000 (the Dockerfile default of 8080 would
+      # otherwise leave port 8000 dead and the frontend unable to reach us).
+      PORT: "8000"
       DATABASE_URL: postgresql://${POSTGRES_USER:-issuecompass}:${POSTGRES_PASSWORD:-issuecompass}@db:5432/${POSTGRES_DB:-issuecompass}
       REDIS_URL: redis://redis:6379
       SECRET_KEY: ${SECRET_KEY}
@@ -71,6 +77,46 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "8000:8000"
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ─── ARQ Background Worker ──────────────────────────────────
+  # Runs scheduled index/cleanup cron jobs (see app.worker.WorkerSettings).
+  # Without this service, the local issues table is never populated by the
+  # scheduler and /issues/matches falls back entirely to live GitHub fetches.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: issuecompass_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-issuecompass}:${POSTGRES_PASSWORD:-issuecompass}@db:5432/${POSTGRES_DB:-issuecompass}
+      REDIS_URL: redis://redis:6379
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      AI_ENABLED: "true"
+      JINA_API_KEY: ${JINA_API_KEY}
+      EMBEDDINGS_ENABLED: ${EMBEDDINGS_ENABLED:-true}
+      # NullPool (DB_POOL_SIZE=0) is PgBouncer-safe and avoids idle
+      # connections on the long-lived worker process.
+      DB_POOL_SIZE: "0"
+      REDIS_MAX_CONNECTIONS: "20"
+      REDIS_SOCKET_TIMEOUT: "5"
+      REDIS_SOCKET_CONNECT_TIMEOUT: "5"
+    # Skip DB reconcile/migrations here — owned by the backend service.
+    command: ["arq", "app.worker.WorkerSettings"]
     networks:
       - internal
     deploy:

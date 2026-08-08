@@ -64,36 +64,6 @@ def test_explain_score_partial():
     assert "Partial match" in text
 
 
-def test_keyword_score_match():
-    from app.models.models import Issue
-    issue = Issue(
-        id=1,
-        github_id=1,
-        number=1,
-        title="Build a Python API",
-        body="Using Django framework",
-        html_url="https://example.com",
-    )
-    user_skills = {"languages": {"python": 1.0, "django": 0.5}, "topics": ["api"]}
-    score = matching_service._keyword_score(user_skills, issue)
-    assert score > 0
-
-
-def test_keyword_score_no_match():
-    from app.models.models import Issue
-    issue = Issue(
-        id=2,
-        github_id=2,
-        number=2,
-        title="Rust systems programming",
-        body="Low-level memory management",
-        html_url="https://example.com",
-    )
-    user_skills = {"languages": {"python": 1.0}, "topics": ["web"]}
-    score = matching_service._keyword_score(user_skills, issue)
-    assert score == 0
-
-
 class TestFingerprintCacheKey:
     """Tests for the Redis cache key generator."""
 

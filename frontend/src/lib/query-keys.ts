@@ -13,8 +13,6 @@ export const queryKeys = {
     all: ["issues"] as const,
     matches: (params?: Record<string, unknown>) =>
       ["issues", "matches", params ?? {}] as const,
-    search: (params: Record<string, unknown>) =>
-      ["issues", "search", params] as const,
     smartSearch: (params: Record<string, unknown>) =>
       ["issues", "smart-search", params] as const,
     trending: (params?: Record<string, unknown>) =>

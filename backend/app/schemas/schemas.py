@@ -104,22 +104,7 @@ class IssueMatchResponse(BaseModel):
     user_skills: Optional[SkillFingerprint] = None
 
 
-# ─── Stats Schemas ───────────────────────────────────────────
-
-class PlatformStats(BaseModel):
-    total_users: int
-    total_issues_indexed: int
-    total_repos_indexed: int
-    total_matches_made: int
-
-
 # ─── Search & Trending Schemas ──────────────────────────────
-
-class SearchResult(BaseModel):
-    matches: List[MatchedIssue]
-    total: int
-    query: str
-
 
 class SmartSearchResult(BaseModel):
     matches: List[MatchedIssue]

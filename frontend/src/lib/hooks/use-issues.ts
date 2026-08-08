@@ -24,22 +24,6 @@ export function useMatches(params?: MatchesParams, enabled?: boolean) {
   });
 }
 
-type SearchParams = Parameters<typeof issuesApi.search>[0];
-
-export function useSearch(params: SearchParams | null) {
-  return useQuery({
-    queryKey: queryKeys.issues.search(
-      (params ?? {}) as Record<string, unknown>
-    ),
-    queryFn: ({ signal }) =>
-      issuesApi.search(params!, signal).then((r) => r.data),
-    enabled: !!params && !!params.q?.trim(),
-    staleTime: cacheConfig.issues.search.staleTime,
-    gcTime: cacheConfig.issues.search.gcTime,
-    retry: 1,
-  });
-}
-
 type SmartSearchParams = Parameters<typeof issuesApi.smartSearch>[0];
 
 export function useSmartSearch(params: SmartSearchParams | null) {

@@ -164,18 +164,6 @@ export const issuesApi = {
     signal?: AbortSignal
   ) => api.get("/issues/matches", { params, signal }),
 
-  search: (
-    params: {
-      q: string;
-      language?: string;
-      difficulty?: string;
-      label?: string;
-      limit?: number;
-      offset?: number;
-    },
-    signal?: AbortSignal
-  ) => api.get("/issues/search", { params, signal }),
-
   getTrending: (
     params?: {
       language?: string;
