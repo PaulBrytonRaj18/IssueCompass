@@ -1,4 +1,5 @@
 """Route integration tests with mocked database."""
+
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -46,7 +47,11 @@ def _make_mock_session():
     session.execute = AsyncMock(side_effect=execute_side_effect)
     session.add = MagicMock()
     session.commit = AsyncMock(return_value=None)
-    session.refresh = AsyncMock(side_effect=lambda obj: setattr(obj, "id", 1) or setattr(obj, "created_at", datetime(2025, 1, 1)))
+    session.refresh = AsyncMock(
+        side_effect=lambda obj: (
+            setattr(obj, "id", 1) or setattr(obj, "created_at", datetime(2025, 1, 1))
+        )
+    )
     session.close = AsyncMock()
     return session
 
@@ -301,6 +306,7 @@ class TestMetricsEndpoint:
     def test_metrics_with_key(self, client):
         with patch("main.settings.METRICS_API_KEY", "secret123"):
             from main import app
+
             with TestClient(app) as c:
                 resp = c.get("/metrics", headers={"X-Metrics-Key": "secret123"})
                 assert resp.status_code == 200
@@ -308,6 +314,7 @@ class TestMetricsEndpoint:
     def test_metrics_with_wrong_key(self, client):
         with patch("main.settings.METRICS_API_KEY", "secret123"):
             from main import app
+
             with TestClient(app) as c:
                 resp = c.get("/metrics", headers={"X-Metrics-Key": "wrong"})
                 assert resp.status_code == 403

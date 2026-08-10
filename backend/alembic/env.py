@@ -24,6 +24,7 @@ config = context.config
 _database_url = os.environ.get("DATABASE_URL", "")
 if not _database_url:
     from app.core.config import get_settings
+
     _database_url = get_settings().DATABASE_URL
 
 # Strip async driver prefix — Alembic uses sync psycopg2 engine
@@ -34,6 +35,7 @@ _migration_url = _database_url.replace("+asyncpg", "")
 _ssl_mode = os.environ.get("DB_SSL_MODE", "")
 if not _ssl_mode:
     from app.core.config import get_settings
+
     _ssl_mode = get_settings().DB_SSL_MODE
 
 config.set_main_option("sqlalchemy.url", _migration_url)

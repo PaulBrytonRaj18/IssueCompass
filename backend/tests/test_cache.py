@@ -264,6 +264,7 @@ class TestCacheGetWithStale:
 
         await cache_get_with_stale("clear_test", 3600, AsyncMock(return_value="ok"))
         from app.core.cache import _in_flight
+
         assert "clear_test" not in _in_flight
 
 

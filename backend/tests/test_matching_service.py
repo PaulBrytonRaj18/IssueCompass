@@ -1,4 +1,3 @@
-
 from app.services import matching_service, scoring_service
 
 
@@ -68,8 +67,12 @@ class TestFingerprintCacheKey:
     """Tests for the Redis cache key generator."""
 
     def test_key_is_order_independent(self):
-        a = matching_service._fingerprint_cache_key({"languages": {"python": 0.6, "typescript": 0.4}})
-        b = matching_service._fingerprint_cache_key({"languages": {"typescript": 0.4, "python": 0.6}})
+        a = matching_service._fingerprint_cache_key(
+            {"languages": {"python": 0.6, "typescript": 0.4}}
+        )
+        b = matching_service._fingerprint_cache_key(
+            {"languages": {"typescript": 0.4, "python": 0.6}}
+        )
         assert a == b
 
     def test_key_starts_with_prefix(self):
@@ -118,22 +121,30 @@ class TestConvertRawIssueToMatchDict:
     }
 
     def test_produces_required_keys(self):
-        d = matching_service._convert_raw_issue_to_match_dict(self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75)
+        d = matching_service._convert_raw_issue_to_match_dict(
+            self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75
+        )
         required = ["match_score", "_is_live", "is_live_result", "issue", "repository"]
         for key in required:
             assert key in d, f"Missing key: {key}"
 
     def test_is_live_flag_is_true(self):
-        d = matching_service._convert_raw_issue_to_match_dict(self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75)
+        d = matching_service._convert_raw_issue_to_match_dict(
+            self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75
+        )
         assert d["_is_live"] is True
         assert d["is_live_result"] is True
 
     def test_good_first_issue_flag_set(self):
-        d = matching_service._convert_raw_issue_to_match_dict(self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75)
+        d = matching_service._convert_raw_issue_to_match_dict(
+            self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75
+        )
         assert d["issue"]["is_good_first_issue"] is True
 
     def test_matching_skills_contains_overlap(self):
-        d = matching_service._convert_raw_issue_to_match_dict(self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75)
+        d = matching_service._convert_raw_issue_to_match_dict(
+            self.RAW_ISSUE, self.RAW_REPO, self.USER_SKILLS, 0.75
+        )
         assert "go" in d["matching_skills"] or "cli" in d["matching_skills"]
 
 

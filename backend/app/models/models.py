@@ -37,10 +37,14 @@ class User(Base):
     # Skill fingerprint stored as JSON and vector
     skill_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     skill_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(128), nullable=True)
-    skill_last_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    skill_last_updated: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
@@ -109,13 +113,16 @@ class SavedIssue(Base):
     __table_args__ = (UniqueConstraint("user_id", "issue_id", name="uq_user_issue"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    issue_id: Mapped[int] = mapped_column(Integer, ForeignKey("issues.id", ondelete="CASCADE"), index=True)
-    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    issue_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("issues.id", ondelete="CASCADE"), index=True
+    )
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
     status: Mapped[str] = mapped_column(String(50), default="saved")  # saved, in_progress, done
 
     user: Mapped["User"] = relationship("User", back_populates="saved_issues")
     issue: Mapped["Issue"] = relationship("Issue", back_populates="saved_by")
-
-
-

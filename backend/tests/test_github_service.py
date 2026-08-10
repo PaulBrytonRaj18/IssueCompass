@@ -1,4 +1,5 @@
 """GitHub service tests — all external calls are mocked."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,7 +20,9 @@ async def test_search_issues_global_returns_dict():
     mock_response.headers = fake_headers
     mock_response.json = MagicMock(return_value={"items": [], "total_count": 0})
 
-    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)
+    ):
         result = await search_issues_global(language="python", label="good first issue")
         assert isinstance(result, dict)
         assert "items" in result
@@ -31,7 +34,9 @@ async def test_fetch_user_not_found():
     mock_response.status_code = 404
     mock_response.headers = {}
 
-    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)
+    ):
         result = await fetch_user("nonexistent-user-that-does-not-exist")
         assert result is None
 
@@ -43,7 +48,9 @@ async def test_fetch_user_returns_dict():
     mock_response.headers = {"X-RateLimit-Remaining": "100"}
     mock_response.json = MagicMock(return_value={"login": "testuser", "id": 1, "public_repos": 5})
 
-    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)
+    ):
         result = await fetch_user("testuser")
         assert result is not None
         assert result["login"] == "testuser"
@@ -56,7 +63,9 @@ async def test_fetch_user_repos_returns_list():
     mock_response.headers = {"X-RateLimit-Remaining": "100"}
     mock_response.json = MagicMock(return_value=[{"name": "repo1", "fork": False}])
 
-    with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)):
+    with patch(
+        "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_response)
+    ):
         result = await fetch_user_repos("testuser")
         assert isinstance(result, list)
 

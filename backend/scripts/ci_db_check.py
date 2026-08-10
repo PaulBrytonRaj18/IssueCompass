@@ -134,7 +134,10 @@ def check_pgbouncer() -> int:
     if isinstance(pool, NullPool):
         _ok("pgbouncer", "poolclass=NullPool (session-mode PgBouncer)")
     elif isinstance(pool, QueuePool):
-        _ok("pgbouncer", f"poolclass=QueuePool(size={pool.size()}, overflow={pool._max_overflow}) (transaction-mode PgBouncer)")
+        _ok(
+            "pgbouncer",
+            f"poolclass=QueuePool(size={pool.size()}, overflow={pool._max_overflow}) (transaction-mode PgBouncer)",
+        )
     else:
         _fail("pgbouncer", f"unexpected poolclass={type(pool).__name__}")
         errors += 1
@@ -164,8 +167,12 @@ async def check_schema() -> int:
             print(f"  Tables ({len(tables)}): {sorted(tables)}")
 
             expected_tables = {
-                "users", "repositories", "issues",
-                "saved_searches", "saved_issues", "alembic_version",
+                "users",
+                "repositories",
+                "issues",
+                "saved_searches",
+                "saved_issues",
+                "alembic_version",
             }
             missing = expected_tables - tables
             if missing:
@@ -191,8 +198,7 @@ async def check_schema() -> int:
             try:
                 r = await conn.execute(
                     text(
-                        "SELECT installed_version FROM pg_available_extensions "
-                        "WHERE name='vector'"
+                        "SELECT installed_version FROM pg_available_extensions WHERE name='vector'"
                     )
                 )
                 ext_ver = r.scalar()
@@ -256,6 +262,7 @@ async def check_runtime() -> int:
 
     # ── Verify engine uses a valid pool class ───────────────────────────
     from sqlalchemy.pool import NullPool, QueuePool
+
     pool = engine.pool
     pool_name = type(pool).__name__
     if isinstance(pool, NullPool):

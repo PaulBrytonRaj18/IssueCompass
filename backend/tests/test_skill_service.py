@@ -23,8 +23,20 @@ def test_stable_hash_different_inputs_different_buckets():
 
 async def test_build_skill_fingerprint_basic():
     repos = [
-        {"name": "repo1", "language": "Python", "topics": ["web", "api"], "stargazers_count": 10, "fork": False},
-        {"name": "repo2", "language": "JavaScript", "topics": ["frontend", "react"], "stargazers_count": 5, "fork": False},
+        {
+            "name": "repo1",
+            "language": "Python",
+            "topics": ["web", "api"],
+            "stargazers_count": 10,
+            "fork": False,
+        },
+        {
+            "name": "repo2",
+            "language": "JavaScript",
+            "topics": ["frontend", "react"],
+            "stargazers_count": 5,
+            "fork": False,
+        },
     ]
     fp = await build_skill_fingerprint(repos)
     assert fp["total_repos"] == 2
@@ -75,14 +87,18 @@ async def test_skill_fingerprint_to_vector_output_shape():
     assert len(vec) == 128
     assert all(isinstance(v, float) for v in vec)
     import numpy as np
+
     norm = np.linalg.norm(vec)
     assert abs(norm - 1.0) < 0.01
 
 
 async def test_issue_text_to_vector_output_shape():
-    vec = await issue_text_to_vector("Add Python support", "We need to support python 3.11", ["enhancement"])
+    vec = await issue_text_to_vector(
+        "Add Python support", "We need to support python 3.11", ["enhancement"]
+    )
     assert len(vec) == 128
     import numpy as np
+
     norm = np.linalg.norm(vec)
     assert abs(norm - 1.0) < 0.01 or norm == 0
 
@@ -92,11 +108,14 @@ async def test_issue_text_to_vector_with_none_labels():
     assert len(vec) == 128
 
 
-@pytest.mark.parametrize("labels,expected_cat", [
-    (["backend", "enhancement"], "backend"),
-    (["good first issue"], None),
-    (None, "backend"),
-])
+@pytest.mark.parametrize(
+    "labels,expected_cat",
+    [
+        (["backend", "enhancement"], "backend"),
+        (["good first issue"], None),
+        (None, "backend"),
+    ],
+)
 async def test_extract_required_skills(labels, expected_cat):
     skills = await extract_required_skills(
         "Add Python API endpoints with detailed discussion",
@@ -109,10 +128,14 @@ async def test_extract_required_skills(labels, expected_cat):
 
 
 async def test_extract_required_skills_beginner():
-    skills = await extract_required_skills("Easy beginner issue", "Simple starter task", ["good first issue"])
+    skills = await extract_required_skills(
+        "Easy beginner issue", "Simple starter task", ["good first issue"]
+    )
     assert skills["complexity"] == 0.2
 
 
 async def test_extract_required_skills_advanced():
-    skills = await extract_required_skills("Complex advanced feature", "Expert level implementation", ["enhancement"])
+    skills = await extract_required_skills(
+        "Complex advanced feature", "Expert level implementation", ["enhancement"]
+    )
     assert skills["complexity"] == 0.8

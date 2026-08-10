@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 # ─── Auth Schemas ────────────────────────────────────────────
 
+
 class GitHubUserData(BaseModel):
     github_id: int
     github_username: str
@@ -25,6 +26,7 @@ class TokenResponse(BaseModel):
 
 
 # ─── User Schemas ────────────────────────────────────────────
+
 
 class UserPublic(BaseModel):
     id: int
@@ -53,6 +55,7 @@ class SkillFingerprint(BaseModel):
 
 # ─── Repository Schemas ──────────────────────────────────────
 
+
 class RepositoryPublic(BaseModel):
     id: int
     full_name: str
@@ -68,6 +71,7 @@ class RepositoryPublic(BaseModel):
 
 
 # ─── Issue Schemas ───────────────────────────────────────────
+
 
 class IssuePublic(BaseModel):
     id: int
@@ -106,6 +110,7 @@ class IssueMatchResponse(BaseModel):
 
 # ─── Search & Trending Schemas ──────────────────────────────
 
+
 class SmartSearchResult(BaseModel):
     matches: List[MatchedIssue]
     total: int
@@ -121,4 +126,3 @@ class TrendingResult(BaseModel):
 
 
 TokenResponse.model_rebuild()
-

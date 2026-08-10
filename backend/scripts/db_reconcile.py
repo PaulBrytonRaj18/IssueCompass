@@ -60,8 +60,7 @@ async def reconcile() -> int:
         },
     )
     print(
-        f"DB_RECONCILE: engine created — target={_mask_db_url(db_url)} "
-        "stmt_cache=0 fail_fast=True"
+        f"DB_RECONCILE: engine created — target={_mask_db_url(db_url)} stmt_cache=0 fail_fast=True"
     )
     try:
         async with engine.connect() as conn:

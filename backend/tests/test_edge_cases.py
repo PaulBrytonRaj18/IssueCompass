@@ -25,9 +25,17 @@ from app.services.skill_service import (
 
 def _make_repo(**kwargs):
     defaults = dict(
-        id=1, github_id=1, full_name="owner/repo", name="repo", owner_login="owner",
-        html_url="https://github.com/owner/repo", stars=100, forks=10,
-        primary_language="python", topics=[], is_archived=False,
+        id=1,
+        github_id=1,
+        full_name="owner/repo",
+        name="repo",
+        owner_login="owner",
+        html_url="https://github.com/owner/repo",
+        stars=100,
+        forks=10,
+        primary_language="python",
+        topics=[],
+        is_archived=False,
         last_indexed=datetime.now(timezone.utc),
     )
     defaults.update(kwargs)
@@ -36,9 +44,17 @@ def _make_repo(**kwargs):
 
 def _make_issue(**kwargs):
     defaults = dict(
-        id=1, github_id=100, number=1, title="Test issue", body="Fix the bug",
-        html_url="https://github.com/owner/repo/issues/1", state="open", labels=[],
-        is_good_first_issue=False, is_help_wanted=False, comments=5,
+        id=1,
+        github_id=100,
+        number=1,
+        title="Test issue",
+        body="Fix the bug",
+        html_url="https://github.com/owner/repo/issues/1",
+        state="open",
+        labels=[],
+        is_good_first_issue=False,
+        is_help_wanted=False,
+        comments=5,
         created_at=datetime.now(timezone.utc),
         required_skills={"categories": {"backend": ["python"]}, "labels": []},
     )
@@ -65,9 +81,22 @@ class TestScoringEdgeCases:
     def test_freshness_edge_boundaries(self):
         """Test the exact boundary values (7, 30, 90 days)."""
         now = datetime.now(timezone.utc)
-        assert scoring_service.compute_freshness_score(_make_issue(created_at=now - timedelta(days=7))) == 0.8
-        assert scoring_service.compute_freshness_score(_make_issue(created_at=now - timedelta(days=30))) == 0.5
-        assert scoring_service.compute_freshness_score(_make_issue(created_at=now - timedelta(days=90))) == 0.2
+        assert (
+            scoring_service.compute_freshness_score(_make_issue(created_at=now - timedelta(days=7)))
+            == 0.8
+        )
+        assert (
+            scoring_service.compute_freshness_score(
+                _make_issue(created_at=now - timedelta(days=30))
+            )
+            == 0.5
+        )
+        assert (
+            scoring_service.compute_freshness_score(
+                _make_issue(created_at=now - timedelta(days=90))
+            )
+            == 0.2
+        )
 
     def test_popularity_max_score(self):
         """Max achievable: 0.3 (comments>20) + 0.4 (stars>10k) + 0.2 (forks>1k) = 0.9"""
@@ -77,15 +106,35 @@ class TestScoringEdgeCases:
 
     def test_popularity_star_boundaries(self):
         issue = _make_issue(comments=0)
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=10_001, forks=0)) == 0.4  # >10000
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=10_000, forks=0)) == 0.3  # >1000
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=1_001, forks=0)) == 0.3  # >1000
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=1_000, forks=0)) == 0.2  # >100
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=101, forks=0)) == 0.2  # >100
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=100, forks=0)) == 0.1  # >10
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=11, forks=0)) == 0.1  # >10
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=10, forks=0)) == 0.0  # none
-        assert scoring_service.compute_popularity_score(issue, _make_repo(stars=0, forks=0)) == 0.0  # none
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=10_001, forks=0))
+            == 0.4
+        )  # >10000
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=10_000, forks=0))
+            == 0.3
+        )  # >1000
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=1_001, forks=0)) == 0.3
+        )  # >1000
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=1_000, forks=0)) == 0.2
+        )  # >100
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=101, forks=0)) == 0.2
+        )  # >100
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=100, forks=0)) == 0.1
+        )  # >10
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=11, forks=0)) == 0.1
+        )  # >10
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=10, forks=0)) == 0.0
+        )  # none
+        assert (
+            scoring_service.compute_popularity_score(issue, _make_repo(stars=0, forks=0)) == 0.0
+        )  # none
 
     def test_interest_match_empty_issue_skills(self):
         user = {"languages": {"python": 0.8}, "topics": ["web"], "categories": {}, "top_skills": []}
@@ -141,8 +190,18 @@ class TestScoringEdgeCases:
         """All max inputs should produce a very high score."""
         score = scoring_service.score_live_issue(
             {"languages": {"python": 1.0, "go": 1.0}, "topics": ["api", "web", "cli"]},
-            {"title": "x", "labels": [{"name": "good first issue"}, {"name": "help wanted"}], "comments": 100, "updated_at": datetime.now(timezone.utc).isoformat()},
-            {"language": "Python", "topics": ["api", "web", "cli"], "stargazers_count": 100_000, "forks_count": 10_000},
+            {
+                "title": "x",
+                "labels": [{"name": "good first issue"}, {"name": "help wanted"}],
+                "comments": 100,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "language": "Python",
+                "topics": ["api", "web", "cli"],
+                "stargazers_count": 100_000,
+                "forks_count": 10_000,
+            },
         )
         assert score >= 0.90, f"Expected high score for max inputs, got {score}"
 
@@ -193,12 +252,30 @@ class TestMatchingEdgeCases:
 
     def test_convert_raw_issue_no_labels(self):
         d = matching_service._convert_raw_issue_to_match_dict(
-            {"id": 1, "number": 1, "title": "x", "body": "", "html_url": "", "labels": [],
-             "comments": 0, "created_at": "2025-01-01T00:00:00Z", "updated_at": None,
-             "pull_request": None},
-            {"full_name": "a/b", "name": "b", "html_url": "", "language": "Go",
-             "stargazers_count": 0, "forks_count": 0, "topics": [], "archived": False},
-            {"languages": {}}, 0.5,
+            {
+                "id": 1,
+                "number": 1,
+                "title": "x",
+                "body": "",
+                "html_url": "",
+                "labels": [],
+                "comments": 0,
+                "created_at": "2025-01-01T00:00:00Z",
+                "updated_at": None,
+                "pull_request": None,
+            },
+            {
+                "full_name": "a/b",
+                "name": "b",
+                "html_url": "",
+                "language": "Go",
+                "stargazers_count": 0,
+                "forks_count": 0,
+                "topics": [],
+                "archived": False,
+            },
+            {"languages": {}},
+            0.5,
         )
         assert d["issue"]["is_good_first_issue"] is False
         assert len(d["matching_skills"]) == 0
@@ -240,7 +317,8 @@ class TestSearchEdgeCases:
         intent.labels = []
         intent.categories = []
         score = _keyword_relevance_score(
-            MagicMock(title="test", body="test body", labels=[]), intent,
+            MagicMock(title="test", body="test body", labels=[]),
+            intent,
         )
         assert score == 0.3  # base score when no keywords match
 
@@ -277,8 +355,15 @@ class TestSkillEdgeCases:
         assert fp["total_repos"] == 1
 
     async def test_skill_fingerprint_to_vector_empty_profile(self):
-        fp = {"languages": {}, "topics": [], "categories": {}, "experience_level": "beginner",
-              "top_skills": [], "total_repos": 0, "total_stars_received": 0}
+        fp = {
+            "languages": {},
+            "topics": [],
+            "categories": {},
+            "experience_level": "beginner",
+            "top_skills": [],
+            "total_repos": 0,
+            "total_stars_received": 0,
+        }
         vec = await skill_fingerprint_to_vector(fp)
         assert len(vec) == 128
 
@@ -315,6 +400,7 @@ class TestAIEdgeCases:
             patch("app.services.ai_service._call_groq", new=AsyncMock(return_value=None)),
         ):
             from app.services.ai_service import parse_query_with_ai
+
             result = await parse_query_with_ai("test query")
             assert result is None
 
@@ -322,6 +408,7 @@ class TestAIEdgeCases:
         """With AI disabled, should return None immediately."""
         with patch("app.services.ai_service.AI_ENABLED", False):
             from app.services.ai_service import parse_query_with_ai
+
             result = await parse_query_with_ai("test")
             assert result is None
 
@@ -335,17 +422,23 @@ class TestGithubEdgeCases:
     async def test_fetch_user_returned_none(self):
         """A 404 response should propagate as None."""
         from app.services.github_service import fetch_user
+
         mock_resp = MagicMock(status_code=404, headers={})
-        with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_resp)):
+        with patch(
+            "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_resp)
+        ):
             result = await fetch_user("nobody")
             assert result is None
 
     async def test_search_issues_global_empty_response(self):
         """Empty search should still return a dict, not crash."""
         from app.services.github_service import search_issues_global
+
         mock_resp = MagicMock(status_code=200, headers={"X-RateLimit-Remaining": "100"})
         mock_resp.json = MagicMock(return_value={"items": [], "total_count": 0})
-        with patch("app.services.github_service._gh_request", new=AsyncMock(return_value=mock_resp)):
+        with patch(
+            "app.services.github_service._gh_request", new=AsyncMock(return_value=mock_resp)
+        ):
             result = await search_issues_global()
             assert isinstance(result, dict)
             assert result["items"] == []
@@ -360,6 +453,7 @@ class TestWorkerEdgeCases:
     async def test_full_index_no_languages(self):
         """Should handle empty language list gracefully."""
         from app.worker import full_index
+
         with patch("app.core.cache.cache_delete_pattern", new=AsyncMock()):
             result = await full_index({}, languages=[])
             assert result["total_indexed"] == 0
@@ -367,6 +461,7 @@ class TestWorkerEdgeCases:
     async def test_cleanup_stale_zero_rows(self):
         """Should not crash when no stale issues exist."""
         from app.worker import cleanup_stale_issues_task
+
         mock_db = AsyncMock()
         mock_result = MagicMock()
         mock_result.fetchall.return_value = []

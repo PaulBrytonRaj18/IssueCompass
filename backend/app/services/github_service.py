@@ -55,7 +55,9 @@ async def _gh_request(method: str, url: str, **kwargs) -> httpx.Response:
     """Make a GitHub API request with rate-limit awareness and connection reuse."""
     global _gh_rate_remaining
     if _gh_rate_remaining < 10:
-        logger.warning("GitHub rate limit critically low (%d remaining). Throttling.", _gh_rate_remaining)
+        logger.warning(
+            "GitHub rate limit critically low (%d remaining). Throttling.", _gh_rate_remaining
+        )
         await asyncio.sleep(1)
 
     client = _get_client()
@@ -76,17 +78,18 @@ async def _gh_request(method: str, url: str, **kwargs) -> httpx.Response:
 
     return resp
 
+
 # Cache key prefixes
 _GITHUB_CACHE_PREFIX = "gh:"
 
 # TTLs in seconds based on data freshness
-TTL_USER = 3600           # GitHub profile rarely changes
-TTL_USER_REPOS = 1800     # Repos change with pushes
+TTL_USER = 3600  # GitHub profile rarely changes
+TTL_USER_REPOS = 1800  # Repos change with pushes
 TTL_REPO_LANGUAGES = 86400  # Language mix is very stable
-TTL_REPO_ISSUES = 600     # Issues change frequently
-TTL_SEARCH_GLOBAL = 600   # Search results are time-sensitive
+TTL_REPO_ISSUES = 600  # Issues change frequently
+TTL_SEARCH_GLOBAL = 600  # Search results are time-sensitive
 TTL_SEARCH_TEXT = 600
-TTL_TRENDING_REPOS = 1800 # Trending changes daily
+TTL_TRENDING_REPOS = 1800  # Trending changes daily
 
 
 def _cache_key(*parts: str) -> str:
@@ -230,11 +233,13 @@ async def search_issues_free_text(
     """Search GitHub issues by free text query. Cached 10 minutes."""
     key = _cache_key(
         "search-text",
-        hashlib.md5(f"{query.lower()}:{language or ''}:{per_page}:{page}".encode()).hexdigest()[:12],
+        hashlib.md5(f"{query.lower()}:{language or ''}:{per_page}:{page}".encode()).hexdigest()[
+            :12
+        ],
     )
 
     async def _fetch():
-        q = f'{query} state:open'
+        q = f"{query} state:open"
         if language:
             q += f" language:{language}"
 
@@ -321,18 +326,12 @@ async def fetch_live_issues_for_user(
     )[:3]
 
     for lang, _ in top_langs:
-        queries.append(
-            f'label:"good first issue" language:{lang} state:open is:issue'
-        )
-        queries.append(
-            f'label:"help wanted" language:{lang} state:open is:issue'
-        )
+        queries.append(f'label:"good first issue" language:{lang} state:open is:issue')
+        queries.append(f'label:"help wanted" language:{lang} state:open is:issue')
 
     top_topics = skill_json.get("topics", [])[:2]
     for topic in top_topics:
-        queries.append(
-            f'topic:{topic} label:"good first issue" state:open is:issue'
-        )
+        queries.append(f'topic:{topic} label:"good first issue" state:open is:issue')
 
     # Cap at max_queries
     queries = queries[:max_queries]

@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
 from sqlalchemy import select
@@ -115,7 +115,9 @@ def _convert_raw_issue_to_match_dict(
             "full_name": raw_repo.get("full_name", ""),
             "name": raw_repo.get("name", ""),
             "description": raw_repo.get("description"),
-            "owner_login": (raw_repo.get("full_name") or "").split("/")[0] if raw_repo.get("full_name") else "",
+            "owner_login": (raw_repo.get("full_name") or "").split("/")[0]
+            if raw_repo.get("full_name")
+            else "",
             "html_url": raw_repo.get("html_url", ""),
             "stars": raw_repo.get("stargazers_count") or raw_repo.get("stars", 0),
             "primary_language": raw_repo.get("language", ""),
@@ -123,9 +125,7 @@ def _convert_raw_issue_to_match_dict(
         },
         "match_score": proxy_score,
         "matching_skills": matching_skills,
-        "why_matched": build_live_issue_explanation(
-            user_skills, raw_issue, raw_repo, proxy_score
-        ),
+        "why_matched": build_live_issue_explanation(user_skills, raw_issue, raw_repo, proxy_score),
         "_is_live": True,
         "_raw_github_id": raw_issue.get("id"),
         "is_live_result": True,
@@ -149,9 +149,7 @@ def _find_live_matching_skills(
     if repo_lang:
         issue_set.add(repo_lang)
     issue_set.update(t.lower() for t in (raw_repo.get("topics") or []))
-    issue_set.update(
-        lbl["name"].lower() for lbl in raw_issue.get("labels", [])
-    )
+    issue_set.update(lbl["name"].lower() for lbl in raw_issue.get("labels", []))
     return sorted(user_set & issue_set)
 
 
@@ -170,9 +168,9 @@ async def _persist_high_score_issues(
 
     async with AsyncSessionLocal() as db:
         high_score = [
-            m for m in live_matches
-            if m.get("match_score", 0) >= PERSIST_SCORE_THRESHOLD
-            and m.get("_raw_github_id")
+            m
+            for m in live_matches
+            if m.get("match_score", 0) >= PERSIST_SCORE_THRESHOLD and m.get("_raw_github_id")
         ]
 
         if not high_score:
@@ -182,9 +180,7 @@ async def _persist_high_score_issues(
             try:
                 github_id = match["_raw_github_id"]
 
-                result = await db.execute(
-                    select(Issue).where(Issue.github_id == github_id)
-                )
+                result = await db.execute(select(Issue).where(Issue.github_id == github_id))
                 existing = result.scalar_one_or_none()
                 if existing:
                     existing.updated_at = match.get("updated_at")
@@ -250,7 +246,9 @@ async def _persist_high_score_issues(
             success_count = len(high_score) - _persist_failure_count
             logger.info(
                 "Persist result: %d succeeded, %d failed out of %d high-score issues",
-                success_count, _persist_failure_count, len(high_score),
+                success_count,
+                _persist_failure_count,
+                len(high_score),
             )
         except Exception as exc:
             await db.rollback()
@@ -285,18 +283,16 @@ async def _get_db_matched_issues(
     )
 
     if filters.get("language"):
-        stmt = stmt.where(
-            Repository.primary_language.ilike(filters["language"])
-        )
+        stmt = stmt.where(Repository.primary_language.ilike(filters["language"]))
     if filters.get("is_good_first_issue"):
         stmt = stmt.where(Issue.is_good_first_issue.is_(True))
     if filters.get("is_help_wanted"):
         stmt = stmt.where(Issue.is_help_wanted.is_(True))
     if filters.get("difficulty"):
         difficulty_map = {
-            "beginner":     (0.0, 0.4),
+            "beginner": (0.0, 0.4),
             "intermediate": (0.4, 0.7),
-            "advanced":     (0.7, 1.0),
+            "advanced": (0.7, 1.0),
         }
         lo, hi = difficulty_map.get(filters["difficulty"], (0.0, 1.0))
         stmt = stmt.where(Issue.complexity_score.between(lo, hi))
@@ -317,20 +313,20 @@ async def _get_db_matched_issues(
         try:
             skill_sim = cosine_similarity(user_vec, issue.skill_vector)
 
-            activity  = compute_repo_activity_score(repo)
+            activity = compute_repo_activity_score(repo)
             freshness = compute_freshness_score(issue)
             popularity = compute_popularity_score(issue, repo)
-            interest  = compute_interest_match(
+            interest = compute_interest_match(
                 user_skills,
                 issue.required_skills or {},
             )
 
             final_score = (
-                skill_sim  * SCORE_WEIGHTS["skill_match"]    +
-                popularity * SCORE_WEIGHTS["popularity"]     +
-                interest   * SCORE_WEIGHTS["interest_match"] +
-                activity   * SCORE_WEIGHTS["repo_activity"]  +
-                freshness  * SCORE_WEIGHTS["freshness"]
+                skill_sim * SCORE_WEIGHTS["skill_match"]
+                + popularity * SCORE_WEIGHTS["popularity"]
+                + interest * SCORE_WEIGHTS["interest_match"]
+                + activity * SCORE_WEIGHTS["repo_activity"]
+                + freshness * SCORE_WEIGHTS["freshness"]
             )
 
             matched_skills = find_matching_skills(
@@ -339,27 +335,34 @@ async def _get_db_matched_issues(
             )
 
             explanation = safe_explain_score(
-                skill_sim, activity, freshness, interest, popularity,
+                skill_sim,
+                activity,
+                freshness,
+                interest,
+                popularity,
                 matched_skills,
                 fallback_score=final_score,
                 issue_id=issue.github_id,
             )
 
-            matches.append({
-                "issue": issue,
-                "repository": repo,
-                "match_score": round(final_score, 4),
-                "matching_skills": matched_skills,
-                "why_matched": explanation,
-                "_is_live": False,
-                "_raw_github_id": issue.github_id,
-                "is_live_result": False,
-                "live_fetched_at": None,
-            })
+            matches.append(
+                {
+                    "issue": issue,
+                    "repository": repo,
+                    "match_score": round(final_score, 4),
+                    "matching_skills": matched_skills,
+                    "why_matched": explanation,
+                    "_is_live": False,
+                    "_raw_github_id": issue.github_id,
+                    "is_live_result": False,
+                    "live_fetched_at": None,
+                }
+            )
         except Exception as exc:
             logger.warning(
                 "Skipping issue github_id=%s due to scoring error: %s",
-                issue.github_id, exc,
+                issue.github_id,
+                exc,
             )
 
     return matches
@@ -392,9 +395,7 @@ async def _get_live_matched_issues(
         proxy_score = score_live_issue(skill_json, raw_issue, raw_repo)
         if proxy_score < 0.10:
             continue
-        match_dict = _convert_raw_issue_to_match_dict(
-            raw_issue, raw_repo, skill_json, proxy_score
-        )
+        match_dict = _convert_raw_issue_to_match_dict(raw_issue, raw_repo, skill_json, proxy_score)
         matches.append(match_dict)
 
     return matches
@@ -430,7 +431,7 @@ async def get_matched_issues(
             if cached:
                 logger.debug("Live match cache HIT key=%s", cache_key)
                 all_matches = cached
-                return all_matches[offset: offset + limit]
+                return all_matches[offset : offset + limit]
         except Exception as exc:
             logger.warning("Redis cache read failed: %s", exc)
 
@@ -447,7 +448,9 @@ async def get_matched_issues(
     )
 
     gather_result: tuple[Any, Any] = await asyncio.gather(
-        db_task, live_task, return_exceptions=True,
+        db_task,
+        live_task,
+        return_exceptions=True,
     )
     db_results_or_err, live_results_or_err = gather_result
 
@@ -469,24 +472,21 @@ async def get_matched_issues(
         raw_id = r.get("_raw_github_id")
         if raw_id is not None:
             db_github_ids.add(raw_id)
-    unique_live = [
-        r for r in live_results if r.get("_raw_github_id") not in db_github_ids
-    ]
+    unique_live = [r for r in live_results if r.get("_raw_github_id") not in db_github_ids]
 
     all_matches = db_results + unique_live
 
     # ── Re-rank the unified list ─────────────────────────────────────────────
     if user.skill_vector is not None:
         from app.services.search_service import re_rank_results
+
         all_matches = re_rank_results(all_matches, user)
     else:
         all_matches.sort(key=lambda m: m.get("match_score", 0), reverse=True)
 
     # ── Fire-and-forget persistence for high-score live issues ───────────────
     if unique_live:
-        asyncio.create_task(
-            _persist_high_score_issues(unique_live)
-        )
+        asyncio.create_task(_persist_high_score_issues(unique_live))
 
     # ── Cache the full ranked list ───────────────────────────────────────────
     if cache and all_matches:
@@ -508,7 +508,7 @@ async def get_matched_issues(
             logger.warning("Redis cache write failed: %s", exc)
 
     # ── Paginate and return ──────────────────────────────────────────────────
-    return all_matches[offset: offset + limit]
+    return all_matches[offset : offset + limit]
 
 
 def _issue_orm_to_dict(issue: Issue) -> dict:

@@ -101,7 +101,10 @@ class TestIndexLanguageIssues:
     @pytest.mark.asyncio
     async def test_index_language_returns_summary(self):
         with (
-            patch("app.services.github_service.search_issues_global", new=AsyncMock(return_value={"items": []})),
+            patch(
+                "app.services.github_service.search_issues_global",
+                new=AsyncMock(return_value={"items": []}),
+            ),
         ):
             result = await index_language_issues({}, "python", "good first issue")
             assert result["language"] == "python"
@@ -109,7 +112,10 @@ class TestIndexLanguageIssues:
 
     @pytest.mark.asyncio
     async def test_index_language_handles_exception(self):
-        with patch("app.services.github_service.search_issues_global", new=AsyncMock(side_effect=Exception("API error"))):
+        with patch(
+            "app.services.github_service.search_issues_global",
+            new=AsyncMock(side_effect=Exception("API error")),
+        ):
             result = await index_language_issues({}, "python", "good first issue")
             assert result["error"] is not None
             assert result["indexed"] == 0

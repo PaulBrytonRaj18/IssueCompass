@@ -14,12 +14,36 @@ from app.services import ai_service, matching_service, scoring_service, skill_se
 logger = logging.getLogger(__name__)
 
 DIFFICULTY_TERMS = {
-    "beginner": ["beginner", "easy", "simple", "starter", "first", "good first",
-                 "good-first", "junior", "entry", "low hanging", "trivial",
-                 "newcomer", "novice", "basic", "introductory"],
+    "beginner": [
+        "beginner",
+        "easy",
+        "simple",
+        "starter",
+        "first",
+        "good first",
+        "good-first",
+        "junior",
+        "entry",
+        "low hanging",
+        "trivial",
+        "newcomer",
+        "novice",
+        "basic",
+        "introductory",
+    ],
     "intermediate": ["intermediate", "medium", "moderate", "standard", "normal"],
-    "advanced": ["advanced", "complex", "difficult", "expert", "hard", "challenging",
-                 "deep", "core", "major", "senior"],
+    "advanced": [
+        "advanced",
+        "complex",
+        "difficult",
+        "expert",
+        "hard",
+        "challenging",
+        "deep",
+        "core",
+        "major",
+        "senior",
+    ],
 }
 
 LANGUAGE_ALIASES = {
@@ -52,16 +76,69 @@ LABEL_TERMS = {
 }
 
 CATEGORY_KEYWORDS = {
-    "frontend": ["frontend", "front-end", "front end", "ui", "ux", "css", "html",
-                 "web", "react", "vue", "angular", "svelte"],
-    "backend": ["backend", "back-end", "back end", "api", "rest", "server",
-                "fastapi", "django", "flask", "express", "spring"],
-    "database": ["database", "db", "sql", "nosql", "postgres", "mysql", "redis",
-                 "mongodb", "cassandra"],
-    "devops": ["devops", "docker", "kubernetes", "ci", "cd", "deploy", "cloud",
-               "aws", "gcp", "azure", "terraform"],
-    "ai_ml": ["ai", "ml", "machine learning", "deep learning", "nlp", "data science",
-              "pytorch", "tensorflow", "llm", "neural"],
+    "frontend": [
+        "frontend",
+        "front-end",
+        "front end",
+        "ui",
+        "ux",
+        "css",
+        "html",
+        "web",
+        "react",
+        "vue",
+        "angular",
+        "svelte",
+    ],
+    "backend": [
+        "backend",
+        "back-end",
+        "back end",
+        "api",
+        "rest",
+        "server",
+        "fastapi",
+        "django",
+        "flask",
+        "express",
+        "spring",
+    ],
+    "database": [
+        "database",
+        "db",
+        "sql",
+        "nosql",
+        "postgres",
+        "mysql",
+        "redis",
+        "mongodb",
+        "cassandra",
+    ],
+    "devops": [
+        "devops",
+        "docker",
+        "kubernetes",
+        "ci",
+        "cd",
+        "deploy",
+        "cloud",
+        "aws",
+        "gcp",
+        "azure",
+        "terraform",
+    ],
+    "ai_ml": [
+        "ai",
+        "ml",
+        "machine learning",
+        "deep learning",
+        "nlp",
+        "data science",
+        "pytorch",
+        "tensorflow",
+        "llm",
+        "neural",
+    ],
     "mobile": ["mobile", "android", "ios", "swift", "kotlin", "flutter", "react native"],
     "systems": ["systems", "embedded", "firmware", "kernel", "driver", "low-level"],
 }
@@ -79,8 +156,16 @@ class SearchIntent:
 
     @property
     def is_empty(self) -> bool:
-        return not any([self.keywords, self.languages, self.difficulty,
-                        self.labels, self.topics, self.categories])
+        return not any(
+            [
+                self.keywords,
+                self.languages,
+                self.difficulty,
+                self.labels,
+                self.topics,
+                self.categories,
+            ]
+        )
 
 
 async def parse_natural_query(query: str) -> SearchIntent:
@@ -113,7 +198,7 @@ async def parse_natural_query(query: str) -> SearchIntent:
     matched_langs = set()
     for canon, aliases in LANGUAGE_ALIASES.items():
         for alias in aliases:
-            if re.search(rf'\b{re.escape(alias)}\b', query_lower):
+            if re.search(rf"\b{re.escape(alias)}\b", query_lower):
                 matched_langs.add(canon)
                 break
     intent.languages = list(matched_langs)
@@ -128,7 +213,7 @@ async def parse_natural_query(query: str) -> SearchIntent:
     # 4. Detect categories
     for cat, keywords in CATEGORY_KEYWORDS.items():
         for kw in keywords:
-            if re.search(rf'\b{re.escape(kw)}\b', query_lower):
+            if re.search(rf"\b{re.escape(kw)}\b", query_lower):
                 intent.categories.append(cat)
                 break
 
@@ -143,7 +228,7 @@ async def parse_natural_query(query: str) -> SearchIntent:
     for keywords in CATEGORY_KEYWORDS.values():
         matched_phrases.update(keywords)
 
-    words = re.findall(r'\b[a-zA-Z][a-zA-Z0-9+#.-]{1,}\b', query_lower)
+    words = re.findall(r"\b[a-zA-Z][a-zA-Z0-9+#.-]{1,}\b", query_lower)
     remaining = [w for w in words if w not in matched_phrases and len(w) > 2]
     intent.keywords = remaining[:10]
 
@@ -182,7 +267,8 @@ async def smart_search(
         intent.difficulty = difficulty
 
     results = await _db_search(
-        db=db, intent=intent,
+        db=db,
+        intent=intent,
         limit=limit + offset * 2,
     )
 
@@ -197,7 +283,7 @@ async def smart_search(
         results = re_rank_results(results, user)
 
     results.sort(key=lambda x: x["match_score"], reverse=True)
-    return results[offset:offset + limit], intent
+    return results[offset : offset + limit], intent
 
 
 async def _db_search(
@@ -208,10 +294,7 @@ async def _db_search(
     conditions = [Issue.state == "open"]
 
     if intent.languages:
-        lang_conditions = [
-            Repository.primary_language.ilike(lang)
-            for lang in intent.languages
-        ]
+        lang_conditions = [Repository.primary_language.ilike(lang) for lang in intent.languages]
         conditions.append(or_(*lang_conditions))
 
     if intent.difficulty:
@@ -258,13 +341,15 @@ async def _db_search(
         issue_skills = issue.required_skills or {}
         keyword_match = _keyword_relevance_score(issue, intent)
 
-        scored.append({
-            "issue": issue,
-            "repository": repo,
-            "match_score": round(keyword_match, 4),
-            "matching_skills": matching_service.find_matching_skills({}, issue_skills),
-            "why_matched": _generate_why(intent, keyword_match),
-        })
+        scored.append(
+            {
+                "issue": issue,
+                "repository": repo,
+                "match_score": round(keyword_match, 4),
+                "matching_skills": matching_service.find_matching_skills({}, issue_skills),
+                "why_matched": _generate_why(intent, keyword_match),
+            }
+        )
 
     return scored
 
@@ -275,43 +360,52 @@ async def _github_fallback(
     per_page: int = 30,
 ) -> List[Dict[str, Any]]:
     from app.services import github_service
+
     try:
-        results = await github_service.search_issues_free_text(
-            query=query, per_page=per_page
-        )
+        results = await github_service.search_issues_free_text(query=query, per_page=per_page)
         items = results.get("items", [])
         parsed = []
         for item in items:
             repo_data = item.get("repository") or {}
-            parsed.append({
-                "issue": Issue(
-                    github_id=item["id"],
-                    number=item["number"],
-                    title=item.get("title", ""),
-                    body=(item.get("body") or "")[:2000],
-                    html_url=item["html_url"],
-                    state="open",
-                    labels=[lb["name"] for lb in item.get("labels", [])],
-                    is_good_first_issue=any("good first" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                    is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                    comments=item.get("comments", 0),
-                    created_at=parse_dt(item.get("created_at")),
-                    updated_at=parse_dt(item.get("updated_at")),
-                    complexity_score=0.5,
-                ),
-                "repository": Repository(
-                    full_name=repo_data.get("full_name", ""),
-                    name=(repo_data.get("full_name") or "").split("/")[-1],
-                    owner_login=(repo_data.get("full_name") or "").split("/")[0] if repo_data.get("full_name") else "",
-                    html_url=repo_data.get("html_url", ""),
-                    stars=repo_data.get("stargazers_count", 0),
-                    primary_language=repo_data.get("language"),
-                    description=repo_data.get("description"),
-                ),
-                "match_score": 0.5,
-                "matching_skills": [],
-                "why_matched": f"GitHub result for: {intent.raw_query or query}",
-            })
+            parsed.append(
+                {
+                    "issue": Issue(
+                        github_id=item["id"],
+                        number=item["number"],
+                        title=item.get("title", ""),
+                        body=(item.get("body") or "")[:2000],
+                        html_url=item["html_url"],
+                        state="open",
+                        labels=[lb["name"] for lb in item.get("labels", [])],
+                        is_good_first_issue=any(
+                            "good first" in (lb.get("name", "") or "").lower()
+                            for lb in item.get("labels", [])
+                        ),
+                        is_help_wanted=any(
+                            "help wanted" in (lb.get("name", "") or "").lower()
+                            for lb in item.get("labels", [])
+                        ),
+                        comments=item.get("comments", 0),
+                        created_at=parse_dt(item.get("created_at")),
+                        updated_at=parse_dt(item.get("updated_at")),
+                        complexity_score=0.5,
+                    ),
+                    "repository": Repository(
+                        full_name=repo_data.get("full_name", ""),
+                        name=(repo_data.get("full_name") or "").split("/")[-1],
+                        owner_login=(repo_data.get("full_name") or "").split("/")[0]
+                        if repo_data.get("full_name")
+                        else "",
+                        html_url=repo_data.get("html_url", ""),
+                        stars=repo_data.get("stargazers_count", 0),
+                        primary_language=repo_data.get("language"),
+                        description=repo_data.get("description"),
+                    ),
+                    "match_score": 0.5,
+                    "matching_skills": [],
+                    "why_matched": f"GitHub result for: {intent.raw_query or query}",
+                }
+            )
         return parsed
     except Exception as e:
         logger.warning("GitHub fallback search failed: %s", e)
@@ -363,9 +457,10 @@ async def _apply_semantic_scoring(
 async def _intent_to_vector(intent: SearchIntent) -> List[float]:
     title = expand_query(intent)
     body = " ".join(
-        intent.keywords + intent.languages +
-        ([intent.difficulty] if intent.difficulty else []) +
-        intent.categories
+        intent.keywords
+        + intent.languages
+        + ([intent.difficulty] if intent.difficulty else [])
+        + intent.categories
     )
     labels = list(set(intent.labels))
     return await skill_service.issue_text_to_vector(title, body, labels)

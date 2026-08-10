@@ -99,9 +99,7 @@ async def github_callback(
                 detail="Invalid or expired auth state. Please sign in again.",
             )
 
-    result = await db.execute(
-        select(User).where(User.github_id == github_data.github_id)
-    )
+    result = await db.execute(select(User).where(User.github_id == github_data.github_id))
     user = result.scalar_one_or_none()
 
     if user:

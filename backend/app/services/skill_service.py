@@ -17,39 +17,119 @@ def _stable_hash(text: str, modulus: int) -> int:
 
 SKILL_CATEGORIES = {
     "frontend": [
-        "javascript", "typescript", "react", "vue", "angular", "svelte",
-        "nextjs", "nuxtjs", "html", "css", "tailwind", "sass", "webpack",
-        "vite", "redux", "graphql", "frontend",
+        "javascript",
+        "typescript",
+        "react",
+        "vue",
+        "angular",
+        "svelte",
+        "nextjs",
+        "nuxtjs",
+        "html",
+        "css",
+        "tailwind",
+        "sass",
+        "webpack",
+        "vite",
+        "redux",
+        "graphql",
+        "frontend",
     ],
     "backend": [
-        "python", "fastapi", "django", "flask", "nodejs", "express",
-        "java", "spring", "golang", "rust", "ruby", "rails", "php",
-        "laravel", "dotnet", "csharp", "kotlin", "scala", "backend",
-        "rest-api", "microservices",
+        "python",
+        "fastapi",
+        "django",
+        "flask",
+        "nodejs",
+        "express",
+        "java",
+        "spring",
+        "golang",
+        "rust",
+        "ruby",
+        "rails",
+        "php",
+        "laravel",
+        "dotnet",
+        "csharp",
+        "kotlin",
+        "scala",
+        "backend",
+        "rest-api",
+        "microservices",
     ],
     "database": [
-        "postgresql", "mysql", "mongodb", "redis", "elasticsearch",
-        "sqlite", "database", "sql", "nosql", "cassandra", "firebase",
-        "supabase", "prisma", "sqlalchemy", "orm",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "redis",
+        "elasticsearch",
+        "sqlite",
+        "database",
+        "sql",
+        "nosql",
+        "cassandra",
+        "firebase",
+        "supabase",
+        "prisma",
+        "sqlalchemy",
+        "orm",
     ],
     "devops": [
-        "docker", "kubernetes", "terraform", "ansible", "jenkins",
-        "github-actions", "ci-cd", "aws", "gcp", "azure", "linux",
-        "nginx", "devops", "infrastructure", "cloud",
+        "docker",
+        "kubernetes",
+        "terraform",
+        "ansible",
+        "jenkins",
+        "github-actions",
+        "ci-cd",
+        "aws",
+        "gcp",
+        "azure",
+        "linux",
+        "nginx",
+        "devops",
+        "infrastructure",
+        "cloud",
     ],
     "ai_ml": [
-        "python", "pytorch", "tensorflow", "keras", "scikit-learn",
-        "machine-learning", "deep-learning", "nlp", "computer-vision",
-        "jupyter", "pandas", "numpy", "transformers", "llm", "ai",
+        "python",
+        "pytorch",
+        "tensorflow",
+        "keras",
+        "scikit-learn",
+        "machine-learning",
+        "deep-learning",
+        "nlp",
+        "computer-vision",
+        "jupyter",
+        "pandas",
+        "numpy",
+        "transformers",
+        "llm",
+        "ai",
         "data-science",
     ],
     "mobile": [
-        "swift", "kotlin", "react-native", "flutter", "dart", "android",
-        "ios", "mobile",
+        "swift",
+        "kotlin",
+        "react-native",
+        "flutter",
+        "dart",
+        "android",
+        "ios",
+        "mobile",
     ],
     "systems": [
-        "rust", "c", "cpp", "c++", "assembly", "embedded", "firmware",
-        "systems", "low-level",
+        "rust",
+        "c",
+        "cpp",
+        "c++",
+        "assembly",
+        "embedded",
+        "firmware",
+        "systems",
+        "low-level",
     ],
 }
 
@@ -98,7 +178,9 @@ def _merge_ai_fingerprint(
         for repo_langs in languages_map.values():
             for lang, bytes_count in repo_langs.items():
                 lang_lower = lang.lower()
-                lang_totals[lang_lower] = lang_totals.get(lang_lower, 0) + max(1, bytes_count // 10000)
+                lang_totals[lang_lower] = lang_totals.get(lang_lower, 0) + max(
+                    1, bytes_count // 10000
+                )
 
     total_lang_weight = sum(lang_totals.values()) or 1
     languages_normalized = {
@@ -132,11 +214,15 @@ def _merge_ai_fingerprint(
 
     return {
         "languages": ai_result.get("languages", languages_normalized),
-        "topics": sorted(set(
-            ai_result.get("categories", {}).get("frontend", [])
-            + ai_result.get("categories", {}).get("backend", [])
-            + ai_result.get("categories", {}).get("ai_ml", [])
-        ))[:20] if ai_result.get("categories") else [t for t, _ in sorted(lang_totals.items(), key=lambda x: -x[1])][:20],
+        "topics": sorted(
+            set(
+                ai_result.get("categories", {}).get("frontend", [])
+                + ai_result.get("categories", {}).get("backend", [])
+                + ai_result.get("categories", {}).get("ai_ml", [])
+            )
+        )[:20]
+        if ai_result.get("categories")
+        else [t for t, _ in sorted(lang_totals.items(), key=lambda x: -x[1])][:20],
         "categories": categories,
         "experience_level": experience_level,
         "top_skills": top_skills,
@@ -170,7 +256,9 @@ def _build_fingerprint_regex(
         for repo_langs in languages_map.values():
             for lang, bytes_count in repo_langs.items():
                 lang_lower = lang.lower()
-                lang_totals[lang_lower] = lang_totals.get(lang_lower, 0) + max(1, bytes_count // 10000)
+                lang_totals[lang_lower] = lang_totals.get(lang_lower, 0) + max(
+                    1, bytes_count // 10000
+                )
 
     total_lang_weight = sum(lang_totals.values()) or 1
     languages_normalized = {
@@ -231,23 +319,61 @@ def _skill_fingerprint_to_vector_hash(fingerprint: Dict[str, Any]) -> List[float
     return vector.tolist()
 
 
-def _issue_text_to_vector_hash(title: str | None, body: str | None, labels: List[str] | None) -> List[float]:
+def _issue_text_to_vector_hash(
+    title: str | None, body: str | None, labels: List[str] | None
+) -> List[float]:
     """Hash-based fallback for issue text vectorization."""
     combined_text = f"{title or ''} {body or ''} {' '.join(labels or [])}".lower()
     vector = np.zeros(SKILL_VECTOR_DIMS, dtype=np.float32)
     all_langs = [
-        "python", "javascript", "typescript", "java", "go", "rust",
-        "ruby", "php", "swift", "kotlin", "c++", "c#", "scala", "r",
-        "react", "vue", "angular", "django", "flask", "fastapi",
-        "express", "spring", "rails", "laravel", "nodejs",
+        "python",
+        "javascript",
+        "typescript",
+        "java",
+        "go",
+        "rust",
+        "ruby",
+        "php",
+        "swift",
+        "kotlin",
+        "c++",
+        "c#",
+        "scala",
+        "r",
+        "react",
+        "vue",
+        "angular",
+        "django",
+        "flask",
+        "fastapi",
+        "express",
+        "spring",
+        "rails",
+        "laravel",
+        "nodejs",
     ]
     for lang in all_langs:
         if lang in combined_text:
             idx = _stable_hash(lang, 64)
             vector[idx] = max(vector[idx], 0.8)
-    for topic_kw in ["frontend", "backend", "api", "database", "ui", "ux",
-                     "test", "bug", "feature", "documentation", "performance",
-                     "security", "docker", "kubernetes", "ci", "deployment"]:
+    for topic_kw in [
+        "frontend",
+        "backend",
+        "api",
+        "database",
+        "ui",
+        "ux",
+        "test",
+        "bug",
+        "feature",
+        "documentation",
+        "performance",
+        "security",
+        "docker",
+        "kubernetes",
+        "ci",
+        "deployment",
+    ]:
         if topic_kw in combined_text:
             idx = 64 + _stable_hash(topic_kw, 32)
             vector[idx] = min(vector[idx] + 0.15, 1.0)
@@ -294,7 +420,9 @@ async def skill_fingerprint_to_vector(fingerprint: Dict[str, Any]) -> List[float
     return _skill_fingerprint_to_vector_hash(fingerprint)
 
 
-async def issue_text_to_vector(title: str | None, body: str | None, labels: List[str] | None) -> List[float]:
+async def issue_text_to_vector(
+    title: str | None, body: str | None, labels: List[str] | None
+) -> List[float]:
     """
     Convert issue text to a skill vector for matching.
 
@@ -314,15 +442,41 @@ def _compute_complexity(title: str, body: str, labels: List[str] | None) -> floa
     combined = f"{title} {body} {' '.join(labels or [])}".lower()
 
     simple_indicators = [
-        "beginner", "easy", "simple", "starter", "first", "good first",
-        "good-first", "low hanging", "trivial", "documentation", "typo",
-        "help wanted", "up-for-grabs", "junior", "entry-level",
-        "quick fix", "small", "minor",
+        "beginner",
+        "easy",
+        "simple",
+        "starter",
+        "first",
+        "good first",
+        "good-first",
+        "low hanging",
+        "trivial",
+        "documentation",
+        "typo",
+        "help wanted",
+        "up-for-grabs",
+        "junior",
+        "entry-level",
+        "quick fix",
+        "small",
+        "minor",
     ]
     complex_indicators = [
-        "complex", "advanced", "difficult", "expert", "hard", "challenging",
-        "deep", "major", "core", "architecture", "performance", "security",
-        "refactor", "complicated", "intricate",
+        "complex",
+        "advanced",
+        "difficult",
+        "expert",
+        "hard",
+        "challenging",
+        "deep",
+        "major",
+        "core",
+        "architecture",
+        "performance",
+        "security",
+        "refactor",
+        "complicated",
+        "intricate",
     ]
 
     simple_count = sum(1 for w in simple_indicators if w in combined)
@@ -343,7 +497,9 @@ def _compute_complexity(title: str, body: str, labels: List[str] | None) -> floa
     return 0.5
 
 
-async def extract_required_skills(title: str, body: str, labels: List[str] | None) -> Dict[str, Any]:
+async def extract_required_skills(
+    title: str, body: str, labels: List[str] | None
+) -> Dict[str, Any]:
     """
     Extract required skills from issue text.
     Uses AI (Groq) when available, falls back to regex.

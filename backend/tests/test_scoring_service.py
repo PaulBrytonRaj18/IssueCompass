@@ -60,6 +60,7 @@ def test_high_stars_boosts_activity():
 
 def test_stale_repo_loses_activity_points():
     from datetime import timedelta
+
     repo = _make_repo(stars=50, last_indexed=datetime.now(timezone.utc) - timedelta(days=60))
     score = scoring_service.compute_repo_activity_score(repo)
     assert score <= 0.7
@@ -75,6 +76,7 @@ def test_recent_issue_scores_max():
 
 def test_old_issue_decays():
     from datetime import timedelta
+
     issue = _make_issue(created_at=datetime.now(timezone.utc) - timedelta(days=200))
     assert scoring_service.compute_freshness_score(issue) == 0.2
 
@@ -242,7 +244,9 @@ class TestScoreLiveIssue:
         assert score == 0.0
 
     def test_perfect_language_match_scores_high(self):
-        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
+        score = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO
+        )
         assert score >= 0.55, f"Expected strong match, got {score}"
 
     def test_language_mismatch_scores_lower(self):
@@ -252,19 +256,28 @@ class TestScoreLiveIssue:
 
     def test_good_first_issue_label_increases_score(self):
         issue_no_label = {**self.BASE_ISSUE, "labels": []}
-        score_with    = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
-        score_without = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_no_label, self.BASE_REPO)
+        score_with = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO
+        )
+        score_without = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, issue_no_label, self.BASE_REPO
+        )
         assert score_with > score_without
 
     def test_stale_issue_scores_lower_than_fresh(self):
         from datetime import datetime, timedelta, timezone
+
         now = datetime.now(timezone.utc)
         old_date = (now - timedelta(days=200)).isoformat()
         fresh_date = (now - timedelta(days=1)).isoformat()
         fresh_issue = {**self.BASE_ISSUE, "updated_at": fresh_date}
         stale_issue = {**self.BASE_ISSUE, "updated_at": old_date}
-        score_fresh = scoring_service.score_live_issue(self.BASE_USER_SKILLS, fresh_issue, self.BASE_REPO)
-        score_stale = scoring_service.score_live_issue(self.BASE_USER_SKILLS, stale_issue, self.BASE_REPO)
+        score_fresh = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, fresh_issue, self.BASE_REPO
+        )
+        score_stale = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, stale_issue, self.BASE_REPO
+        )
         assert score_fresh > score_stale
 
     def test_empty_skill_json_returns_low_score(self):
@@ -272,12 +285,16 @@ class TestScoreLiveIssue:
         assert score < 0.30
 
     def test_score_is_clamped_between_zero_and_one(self):
-        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO)
+        score = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, self.BASE_ISSUE, self.BASE_REPO
+        )
         assert 0.0 <= score <= 1.0
 
     def test_missing_updated_at_does_not_crash(self):
         issue_no_date = {**self.BASE_ISSUE, "updated_at": None, "created_at": None}
-        score = scoring_service.score_live_issue(self.BASE_USER_SKILLS, issue_no_date, self.BASE_REPO)
+        score = scoring_service.score_live_issue(
+            self.BASE_USER_SKILLS, issue_no_date, self.BASE_REPO
+        )
         assert 0.0 <= score <= 1.0
 
 
@@ -295,8 +312,14 @@ class TestSafeExplainScore:
 
     def test_invalid_args_use_fallback(self):
         text = scoring_service.safe_explain_score(
-            None, None, None, None, None, None,
-            fallback_score=0.9, issue_id=999,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            fallback_score=0.9,
+            issue_id=999,
         )
         assert isinstance(text, str)
 

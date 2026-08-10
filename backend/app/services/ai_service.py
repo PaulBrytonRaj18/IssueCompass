@@ -48,6 +48,7 @@ async def close_client() -> None:
         await _shared_client.aclose()
         _shared_client = None
 
+
 SYSTEM_PROMPTS = {
     "skill_analysis": """You are a senior open-source maintainer analyzing a developer's GitHub profile.
 Given their repository data, produce ONLY a JSON object with:
@@ -65,7 +66,6 @@ Rules:
 - Categories should map to: frontend, backend, database, devops, ai_ml, mobile, systems
 - Experience level: <5 repos = beginner, 5-15 = intermediate, >15 = advanced
 - Be generous with skill detection — if a repo uses python + fastapi, list both""",
-
     "issue_analysis": """You are analyzing a GitHub issue to extract required skills.
 Given the issue title, body, and labels, produce ONLY a JSON object with:
 {
@@ -81,7 +81,6 @@ Rules:
 - Complexity: 0.0-0.35=beginner, 0.35-0.65=intermediate, 0.65-1.0=advanced
 - Estimate effort based on issue scope and discussion
 - Categories same as: frontend, backend, database, devops, ai_ml, mobile, systems""",
-
     "match_explanation": """You are explaining why a GitHub issue matches a developer's skills.
 Given the developer's skill profile and the issue requirements, produce ONLY a JSON object with:
 {
@@ -94,7 +93,6 @@ Rules:
 - Be specific: mention actual skills, not generic statements
 - Confidence based on how well skills overlap
 - Keep explanation concise and actionable""",
-
     "query_parsing": """You are parsing a developer's natural language search for open-source issues.
 Given their query, produce ONLY a JSON object with:
 {
@@ -115,7 +113,9 @@ Rules:
 - expanded_query: create a search-friendly version""",
 }
 
-SYSTEM_PROMPTS["vector_text"] = """You generate a dense semantic description of a developer's skills or an issue's requirements.
+SYSTEM_PROMPTS[
+    "vector_text"
+] = """You generate a dense semantic description of a developer's skills or an issue's requirements.
 Produce ONLY a JSON object with:
 {
   "text": "A short paragraph describing the technical profile (max 100 words)"
@@ -322,18 +322,22 @@ async def analyze_skills_with_ai(repos: List[Dict[str, Any]]) -> Optional[Dict[s
     for repo in repos[:20]:
         if repo.get("fork"):
             continue
-        repo_summaries.append({
-            "name": repo.get("full_name", repo.get("name", "")),
-            "lang": repo.get("language"),
-            "desc": (repo.get("description") or "")[:200],
-            "topics": repo.get("topics", [])[:5],
-            "stars": repo.get("stargazers_count", 0),
-        })
+        repo_summaries.append(
+            {
+                "name": repo.get("full_name", repo.get("name", "")),
+                "lang": repo.get("language"),
+                "desc": (repo.get("description") or "")[:200],
+                "topics": repo.get("topics", [])[:5],
+                "stars": repo.get("stargazers_count", 0),
+            }
+        )
 
     if not repo_summaries:
         return None
 
-    cache_key = _cache_key("skills", hashlib.md5(json.dumps(repo_summaries, sort_keys=True).encode()).hexdigest()[:16])
+    cache_key = _cache_key(
+        "skills", hashlib.md5(json.dumps(repo_summaries, sort_keys=True).encode()).hexdigest()[:16]
+    )
 
     async def _execute():
         user_prompt = json.dumps({"repositories": repo_summaries}, indent=2)
@@ -346,19 +350,27 @@ async def analyze_skills_with_ai(repos: List[Dict[str, Any]]) -> Optional[Dict[s
     return await _cached_ai_call(cache_key, AI_CACHE_TTL_SKILLS, _execute)
 
 
-async def analyze_issue_with_ai(title: str, body: str, labels: List[str]) -> Optional[Dict[str, Any]]:
+async def analyze_issue_with_ai(
+    title: str, body: str, labels: List[str]
+) -> Optional[Dict[str, Any]]:
     """Use Groq LLM to extract required skills from an issue."""
     if not AI_ENABLED:
         return None
 
-    cache_key = _cache_key("issue", hashlib.md5(f"{title[:500]}|{(body or '')[:2000]}|{labels}".encode()).hexdigest()[:16])
+    cache_key = _cache_key(
+        "issue",
+        hashlib.md5(f"{title[:500]}|{(body or '')[:2000]}|{labels}".encode()).hexdigest()[:16],
+    )
 
     async def _execute():
-        user_prompt = json.dumps({
-            "title": title[:500],
-            "body": (body or "")[:2000],
-            "labels": labels,
-        }, indent=2)
+        user_prompt = json.dumps(
+            {
+                "title": title[:500],
+                "body": (body or "")[:2000],
+                "labels": labels,
+            },
+            indent=2,
+        )
         raw = await _call_groq(SYSTEM_PROMPTS["issue_analysis"], user_prompt, temp=0.2)
         result = await _parse_json_response(raw)
         if result and "skills" in result:
@@ -380,30 +392,42 @@ async def generate_match_explanation(
     cache_key = _cache_key(
         "explain",
         hashlib.md5(
-            json.dumps({
-                "us": {k: user_skills.get(k) for k in ["top_skills", "experience_level"]},
-                "is": {k: issue_skills.get(k) for k in ["skills", "complexity"]},
-                "s": round(match_score, 2),
-            }, sort_keys=True).encode()
+            json.dumps(
+                {
+                    "us": {k: user_skills.get(k) for k in ["top_skills", "experience_level"]},
+                    "is": {k: issue_skills.get(k) for k in ["skills", "complexity"]},
+                    "s": round(match_score, 2),
+                },
+                sort_keys=True,
+            ).encode()
         ).hexdigest()[:16],
     )
 
     async def _execute():
-        user_prompt = json.dumps({
-            "developer_skills": {
-                "top_skills": user_skills.get("top_skills", [])[:10],
-                "languages": list(user_skills.get("languages", {}).keys())[:10],
-                "experience": user_skills.get("experience_level", "unknown"),
-                "categories": list(user_skills.get("categories", {}).keys()),
+        user_prompt = json.dumps(
+            {
+                "developer_skills": {
+                    "top_skills": user_skills.get("top_skills", [])[:10],
+                    "languages": list(user_skills.get("languages", {}).keys())[:10],
+                    "experience": user_skills.get("experience_level", "unknown"),
+                    "categories": list(user_skills.get("categories", {}).keys()),
+                },
+                "issue_requirements": {
+                    "skills": issue_skills.get("skills", [])
+                    if isinstance(issue_skills.get("skills"), list)
+                    else [],
+                    "categories": list(issue_skills.get("categories", {}).keys())
+                    if isinstance(issue_skills.get("categories"), dict)
+                    else [],
+                    "complexity": issue_skills.get("complexity", 0.5),
+                },
+                "current_match_score": match_score,
             },
-            "issue_requirements": {
-                "skills": issue_skills.get("skills", []) if isinstance(issue_skills.get("skills"), list) else [],
-                "categories": list(issue_skills.get("categories", {}).keys()) if isinstance(issue_skills.get("categories"), dict) else [],
-                "complexity": issue_skills.get("complexity", 0.5),
-            },
-            "current_match_score": match_score,
-        }, indent=2)
-        raw = await _call_groq(SYSTEM_PROMPTS["match_explanation"], user_prompt, temp=0.3, max_tokens=256)
+            indent=2,
+        )
+        raw = await _call_groq(
+            SYSTEM_PROMPTS["match_explanation"], user_prompt, temp=0.3, max_tokens=256
+        )
         result = await _parse_json_response(raw)
         return result.get("explanation") if result else None
 
@@ -434,12 +458,15 @@ async def generate_vector_text(
     if not AI_ENABLED:
         return None
 
-    user_prompt = json.dumps({
-        "languages": fingerprint.get("languages", {}),
-        "top_skills": fingerprint.get("top_skills", []),
-        "categories": fingerprint.get("categories", {}),
-        "experience_level": fingerprint.get("experience_level", "unknown"),
-    }, indent=2)
+    user_prompt = json.dumps(
+        {
+            "languages": fingerprint.get("languages", {}),
+            "top_skills": fingerprint.get("top_skills", []),
+            "categories": fingerprint.get("categories", {}),
+            "experience_level": fingerprint.get("experience_level", "unknown"),
+        },
+        indent=2,
+    )
 
     try:
         raw = await _call_groq(SYSTEM_PROMPTS["vector_text"], user_prompt, temp=0.2, max_tokens=256)

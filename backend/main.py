@@ -26,9 +26,7 @@ class JsonLogFormatter(jsonlogger.JsonFormatter):
 
 
 _handler = logging.StreamHandler()
-_handler.setFormatter(
-    JsonLogFormatter("%(timestamp)s %(level)s %(name)s %(message)s")
-)
+_handler.setFormatter(JsonLogFormatter("%(timestamp)s %(level)s %(name)s %(message)s"))
 logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger("issuecompass")
 
@@ -48,6 +46,7 @@ async def lifespan(app: FastAPI):
     logger.info("IssueCompass API starting up...")
 
     from app.core.database import _pool_label, _use_queue
+
     if _use_queue:
         logger.info(
             "DB: using %s + stmt_cache=0 — QueuePool with PgBouncer "
@@ -55,10 +54,7 @@ async def lifespan(app: FastAPI):
             _pool_label,
         )
     else:
-        logger.info(
-            "DB: using NullPool + stmt_cache=0 — "
-            "PgBouncer session pooler compatible"
-        )
+        logger.info("DB: using NullPool + stmt_cache=0 — PgBouncer session pooler compatible")
 
     config_errors = settings.check_errors()
     if config_errors:
@@ -83,11 +79,13 @@ async def lifespan(app: FastAPI):
     await close_db()
     try:
         from app.services.ai_service import close_client
+
         await close_client()
     except Exception:
         pass
     try:
         from app.services.github_service import close_client
+
         await close_client()
     except Exception:
         pass
@@ -110,17 +108,20 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
     from fastapi.responses import JSONResponse
+
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Try again later."},
         headers={"Retry-After": str(exc.retry_after)},
     )
 
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 
 async def _generic_exception_handler(request: Request, exc: Exception):
     from fastapi.responses import JSONResponse
+
     logger.error(
         "[%s] Unhandled %s on %s %s: %s",
         getattr(request.state, "request_id", "?"),
@@ -131,7 +132,10 @@ async def _generic_exception_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error_id": getattr(request.state, "request_id", None)},
+        content={
+            "detail": "Internal server error",
+            "error_id": getattr(request.state, "request_id", None),
+        },
     )
 
 
@@ -190,6 +194,7 @@ async def root():
 @app.head("/health", include_in_schema=False)
 async def root_head():
     from fastapi.responses import Response
+
     return Response(status_code=200)
 
 
@@ -208,6 +213,7 @@ async def health(request: Request):
     try:
         from app.core.database import AsyncSessionLocal
         from sqlalchemy import text
+
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
             db_ok = True
@@ -241,6 +247,7 @@ async def metrics(request: Request):
     expected = settings.METRICS_API_KEY
     if expected and api_key != expected:
         from fastapi.responses import JSONResponse
+
         return JSONResponse(
             status_code=403,
             content={"error": "Forbidden. Set X-Metrics-Key header."},

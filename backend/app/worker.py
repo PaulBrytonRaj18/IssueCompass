@@ -33,6 +33,7 @@ async def shutdown(ctx):
     logger.info("ARQ worker shutting down")
     await close_redis()
     from app.core.database import _pool_label
+
     logger.info("DB: disposing engine (%s)", _pool_label)
     await db_engine.dispose()
 
@@ -62,11 +63,13 @@ async def index_language_issues(ctx, language: str, label: str = "good first iss
                 if not repo_full_name or "/" not in repo_full_name:
                     continue
                 repo_data = item.get("repository") or {}
-                parsed.append({
-                    "item": item,
-                    "repo_full_name": repo_full_name,
-                    "repo_data": repo_data,
-                })
+                parsed.append(
+                    {
+                        "item": item,
+                        "repo_full_name": repo_full_name,
+                        "repo_data": repo_data,
+                    }
+                )
 
             if not parsed:
                 return {"language": language, "label": label, "indexed": 0}
@@ -85,18 +88,21 @@ async def index_language_issues(ctx, language: str, label: str = "good first iss
                 p = next(p2 for p2 in parsed if p2["repo_full_name"] == full_name)
                 rd = p["repo_data"]
                 import hashlib
+
                 stable_id = int(hashlib.md5(full_name.encode()).hexdigest()[:8], 16)
-                new_repos.append({
-                    "github_id": rd.get("id", stable_id),
-                    "full_name": full_name,
-                    "name": full_name.split("/")[-1],
-                    "owner_login": full_name.split("/")[0],
-                    "html_url": f"https://github.com/{full_name}",
-                    "stars": rd.get("stargazers_count", 0),
-                    "primary_language": rd.get("language"),
-                    "topics": rd.get("topics", []),
-                    "description": rd.get("description"),
-                })
+                new_repos.append(
+                    {
+                        "github_id": rd.get("id", stable_id),
+                        "full_name": full_name,
+                        "name": full_name.split("/")[-1],
+                        "owner_login": full_name.split("/")[0],
+                        "html_url": f"https://github.com/{full_name}",
+                        "stars": rd.get("stargazers_count", 0),
+                        "primary_language": rd.get("language"),
+                        "topics": rd.get("topics", []),
+                        "description": rd.get("description"),
+                    }
+                )
 
             if new_repos:
                 stmt = pg_insert(Repository).values(new_repos)
@@ -131,25 +137,27 @@ async def index_language_issues(ctx, language: str, label: str = "good first iss
                 required_skills, skill_vector = await asyncio.gather(skills_task, vector_task)
                 complexity = required_skills.get("complexity", 0.5)
 
-                new_issues.append({
-                    "github_id": item["id"],
-                    "number": item["number"],
-                    "title": title,
-                    "body": body[:2000] if body else None,
-                    "html_url": item["html_url"],
-                    "state": item.get("state", "open"),
-                    "labels": labels,
-                    "is_good_first_issue": any("good first" in lb.lower() for lb in labels),
-                    "is_help_wanted": any("help wanted" in lb.lower() for lb in labels),
-                    "required_skills": required_skills,
-                    "skill_vector": skill_vector,
-                    "complexity_score": complexity,
-                    "comments": item.get("comments", 0),
-                    "author_login": item.get("user", {}).get("login"),
-                    "created_at": parse_dt(item.get("created_at")),
-                    "updated_at": parse_dt(item.get("updated_at")),
-                    "repository_id": repo.id,
-                })
+                new_issues.append(
+                    {
+                        "github_id": item["id"],
+                        "number": item["number"],
+                        "title": title,
+                        "body": body[:2000] if body else None,
+                        "html_url": item["html_url"],
+                        "state": item.get("state", "open"),
+                        "labels": labels,
+                        "is_good_first_issue": any("good first" in lb.lower() for lb in labels),
+                        "is_help_wanted": any("help wanted" in lb.lower() for lb in labels),
+                        "required_skills": required_skills,
+                        "skill_vector": skill_vector,
+                        "complexity_score": complexity,
+                        "comments": item.get("comments", 0),
+                        "author_login": item.get("user", {}).get("login"),
+                        "created_at": parse_dt(item.get("created_at")),
+                        "updated_at": parse_dt(item.get("updated_at")),
+                        "repository_id": repo.id,
+                    }
+                )
 
             if new_issues:
                 stmt = pg_insert(Issue).values(new_issues)
@@ -174,20 +182,19 @@ async def full_index(ctx, languages: Optional[list] = None):
 
     labels = ["good first issue", "help wanted"]
     sem = asyncio.Semaphore(3)
+
     async def run_with_limit(lang, label):
         async with sem:
             return await index_language_issues(ctx, lang, label)
-    tasks = [
-        run_with_limit(lang, label)
-        for lang in languages
-        for label in labels
-    ]
+
+    tasks = [run_with_limit(lang, label) for lang in languages for label in labels]
     results = await asyncio.gather(*tasks)
 
     total = sum(r.get("indexed", 0) for r in results)
     logger.info("Full index complete: %d items indexed", total)
 
     from app.core.cache import cache_delete_pattern
+
     await cache_delete_pattern("trending:*")
 
     return {"total_indexed": total, "languages": languages}
@@ -202,8 +209,16 @@ async def index_issues_task(ctx: dict) -> None:
     if the DB query returns nothing (cold start).
     """
     base_languages = [
-        "python", "javascript", "typescript", "go", "rust",
-        "java", "c++", "ruby", "php", "swift",
+        "python",
+        "javascript",
+        "typescript",
+        "go",
+        "rust",
+        "java",
+        "c++",
+        "ruby",
+        "php",
+        "swift",
     ]
     labels = ["good first issue", "help wanted"]
 
@@ -239,6 +254,7 @@ async def index_issues_task(ctx: dict) -> None:
 
         # ── Index each (language, label) pair in parallel (max 3 concurrent) ────
         sem = asyncio.Semaphore(3)
+
         async def run_with_limit(lang, label):
             async with sem:
                 try:
@@ -320,4 +336,5 @@ class WorkerSettings:
 
 if __name__ == "__main__":
     from arq import run_worker
+
     asyncio.run(run_worker(WorkerSettings))  # type: ignore[arg-type]

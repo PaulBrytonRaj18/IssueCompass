@@ -28,11 +28,16 @@ async def test_parse_query_with_ai_disabled():
 
 @pytest.mark.asyncio
 async def test_parse_query_with_ai_enabled():
-    mock_groq_response = json.dumps({
-        "keywords": ["bug"], "languages": ["python"],
-        "difficulty": "beginner", "labels": ["bug"],
-        "categories": ["backend"], "expanded_query": "test",
-    })
+    mock_groq_response = json.dumps(
+        {
+            "keywords": ["bug"],
+            "languages": ["python"],
+            "difficulty": "beginner",
+            "labels": ["bug"],
+            "categories": ["backend"],
+            "expanded_query": "test",
+        }
+    )
     with (
         patch("app.services.ai_service.AI_ENABLED", True),
         patch("app.services.ai_service._call_groq", new=AsyncMock(return_value=mock_groq_response)),
@@ -59,11 +64,21 @@ async def test_parse_query_returns_none_on_bad_json():
 
 @pytest.mark.asyncio
 async def test_parse_query_with_cached_result():
-    cached = {"keywords": ["test"], "languages": [], "difficulty": None, "labels": [], "categories": [], "expanded_query": ""}
+    cached = {
+        "keywords": ["test"],
+        "languages": [],
+        "difficulty": None,
+        "labels": [],
+        "categories": [],
+        "expanded_query": "",
+    }
     with (
         patch("app.services.ai_service.AI_ENABLED", True),
         patch("app.services.ai_service.cache_get", new=AsyncMock(return_value=cached)),
-        patch("app.services.ai_service._call_groq", new=AsyncMock(side_effect=RuntimeError("should not be called"))),
+        patch(
+            "app.services.ai_service._call_groq",
+            new=AsyncMock(side_effect=RuntimeError("should not be called")),
+        ),
     ):
         result = await parse_query_with_ai("cached query")
         assert result == cached
@@ -132,6 +147,7 @@ async def test_cached_ai_call_dedup_in_flight():
         patch("app.services.ai_service.cache_set", new=AsyncMock()),
     ):
         from app.services.ai_service import _in_flight
+
         _in_flight.clear()
         await _cached_ai_call("dedup", 3600, slow_factory)
 
@@ -168,7 +184,9 @@ async def test_analyze_issue_returns_none_when_disabled():
 @pytest.mark.asyncio
 async def test_generate_match_explanation_disabled():
     with patch("app.services.ai_service.AI_ENABLED", False):
-        result = await generate_match_explanation({"top_skills": ["python"]}, {"skills": ["python"]}, 0.9)
+        result = await generate_match_explanation(
+            {"top_skills": ["python"]}, {"skills": ["python"]}, 0.9
+        )
         assert result is None
 
 

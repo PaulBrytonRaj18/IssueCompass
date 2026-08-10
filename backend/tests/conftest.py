@@ -27,6 +27,7 @@ if str(backend_dir) not in sys.path:
 
 # ─── Shared helper factories ─────────────────────────────────────────
 
+
 def make_repo(**kwargs: Any) -> MagicMock:
     defaults: dict[str, Any] = dict(
         id=1,
@@ -68,6 +69,7 @@ def make_issue(**kwargs: Any) -> MagicMock:
 
 def make_mock_user(user_id: int = 1) -> MagicMock:
     from app.models.models import User
+
     user = MagicMock(spec=User)
     user.id = user_id
     user.github_id = 12345
@@ -102,9 +104,11 @@ def make_mock_session() -> AsyncMock:
     session.execute = AsyncMock(side_effect=execute_side_effect)
     session.add = MagicMock()
     session.commit = AsyncMock(return_value=None)
-    session.refresh = AsyncMock(side_effect=lambda obj: (
-        setattr(obj, "id", 1) or setattr(obj, "created_at", datetime(2025, 1, 1))
-    ))
+    session.refresh = AsyncMock(
+        side_effect=lambda obj: (
+            setattr(obj, "id", 1) or setattr(obj, "created_at", datetime(2025, 1, 1))
+        )
+    )
     session.close = AsyncMock()
     session.flush = AsyncMock()
     session.rollback = AsyncMock()
@@ -112,6 +116,7 @@ def make_mock_session() -> AsyncMock:
 
 
 # ─── Shared fixtures ────────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_repo() -> MagicMock:
@@ -136,6 +141,7 @@ def mock_session() -> AsyncMock:
 @pytest.fixture
 def auth_token() -> str:
     from app.routes.auth import create_access_token
+
     return create_access_token({"sub": "1"})
 
 

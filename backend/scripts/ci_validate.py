@@ -59,6 +59,7 @@ def _fail(label: str, detail: str = "") -> None:
 async def check_network() -> int:
     """Validate DNS resolution and TCP reachability for the database host."""
     import socket
+
     failed = 0
     print("\n--- 0. Database Network Diagnostics ---")
 
@@ -69,6 +70,7 @@ async def check_network() -> int:
 
     # Parse hostname and port from URL
     from urllib.parse import urlparse
+
     parsed = urlparse(db_url.replace("+asyncpg", ""))
     host = parsed.hostname or "unknown"
     port = parsed.port or 5432
@@ -142,10 +144,16 @@ async def check_async_engine() -> int:
             _fail("PgBouncer", "statement_cache_size is not 0")
             failed += 1
         elif "prepared_statement_cache_size" in PGCONN_ARGS:
-            _fail("PgBouncer", "prepared_statement_cache_size present but asyncpg does not accept this param")
+            _fail(
+                "PgBouncer",
+                "prepared_statement_cache_size present but asyncpg does not accept this param",
+            )
             failed += 1
         else:
-            _ok("PgBouncer", "statement_cache_size=0 (prepared_statement_cache_size is not a valid asyncpg param)")
+            _ok(
+                "PgBouncer",
+                "statement_cache_size=0 (prepared_statement_cache_size is not a valid asyncpg param)",
+            )
     except Exception as e:
         _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
         failed += 1
@@ -153,6 +161,7 @@ async def check_async_engine() -> int:
     # Verify pool class is compatible with PgBouncer
     try:
         from sqlalchemy.pool import NullPool, QueuePool
+
         pool = engine.pool
         if isinstance(pool, NullPool):
             _ok("Pool class", "NullPool — session-mode PgBouncer")
@@ -226,7 +235,8 @@ async def check_alembic() -> int:
     # Check current state
     r = subprocess.run(
         [sys.executable, "-m", "alembic", "current"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     print(r.stdout)
     if r.returncode != 0:
@@ -238,7 +248,8 @@ async def check_alembic() -> int:
     # Run migrations
     r = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     print(r.stdout)
     if r.returncode != 0:
@@ -250,7 +261,8 @@ async def check_alembic() -> int:
     # Verify final state
     r = subprocess.run(
         [sys.executable, "-m", "alembic", "current"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     print(r.stdout)
     if r.returncode != 0:
@@ -272,16 +284,21 @@ async def check_schema() -> int:
 
     try:
         async with engine.connect() as conn:
-            r = await conn.execute(text(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema='public' ORDER BY table_name"
-            ))
+            r = await conn.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema='public' ORDER BY table_name"
+                )
+            )
             tables = [row[0] for row in r]
             print(f"  Tables ({len(tables)}): {tables}")
 
             expected = {
-                "users", "repositories", "issues",
-                "saved_searches", "alembic_version",
+                "users",
+                "repositories",
+                "issues",
+                "saved_searches",
+                "alembic_version",
             }
             missing = expected - set(tables)
             if missing:

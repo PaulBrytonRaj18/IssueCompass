@@ -73,17 +73,24 @@ else:
 # ── DNS diagnostics at startup ───────────────────────────
 _db_host = (
     settings.DATABASE_URL.split("@")[-1].split(":")[0]
-    if "@" in settings.DATABASE_URL else "unknown"
+    if "@" in settings.DATABASE_URL
+    else "unknown"
 )
 try:
     _addrs = socket.getaddrinfo(
-        _db_host, 5432, socket.AF_UNSPEC, socket.SOCK_STREAM,
+        _db_host,
+        5432,
+        socket.AF_UNSPEC,
+        socket.SOCK_STREAM,
     )
     _has_ipv4 = any(a[0] == socket.AF_INET for a in _addrs)
     _has_ipv6 = any(a[0] == socket.AF_INET6 for a in _addrs)
     logger.info(
         "DB_DNS: %s → %d address(es) [v4=%s v6=%s]",
-        _db_host, len(_addrs), _has_ipv4, _has_ipv6,
+        _db_host,
+        len(_addrs),
+        _has_ipv4,
+        _has_ipv6,
     )
     for a in _addrs:
         family = "IPv6" if a[0] == socket.AF_INET6 else "IPv4"
@@ -101,6 +108,7 @@ try:
 except Exception as _dns_err:
     logger.warning("DB_DNS: could not resolve %s: %s", _db_host, _dns_err)
 
+
 # Log connection target with credentials masked
 def _mask_db_url(raw: str) -> str:
     cleaned = raw.replace("+asyncpg", "")
@@ -108,10 +116,10 @@ def _mask_db_url(raw: str) -> str:
         return cleaned.split("@")[0].split("://")[0] + "://****@" + cleaned.split("@", 1)[1]
     return cleaned
 
+
 asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
-    "DB_ENGINE: creating async engine — target=%s asyncpg=%s "
-    "poolclass=%s stmt_cache=0",
+    "DB_ENGINE: creating async engine — target=%s asyncpg=%s poolclass=%s stmt_cache=0",
     _mask_db_url(settings.DATABASE_URL),
     asyncpg_version,
     _pool_label,

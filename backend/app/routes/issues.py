@@ -46,7 +46,9 @@ async def get_matched_issues(
     language: Optional[str] = Query(None, description="Filter by language"),
     is_good_first_issue: Optional[bool] = Query(None, description="Filter by good first issue"),
     is_help_wanted: Optional[bool] = Query(None, description="Filter by help wanted"),
-    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty: beginner, intermediate, advanced"),
+    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(
+        None, description="Filter by difficulty: beginner, intermediate, advanced"
+    ),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -86,6 +88,7 @@ async def get_matched_issues(
         matches.append(match_item)
 
     from app.schemas.schemas import SkillFingerprint
+
     user_skills = None
     if current_user.skill_json:
         try:
@@ -105,9 +108,7 @@ async def get_matched_issues(
 async def index_issues(
     request: Request,
     background_tasks: BackgroundTasks,
-    languages: List[str] = Query(
-        default=["python", "javascript", "typescript", "go", "rust"]
-    ),
+    languages: List[str] = Query(default=["python", "javascript", "typescript", "go", "rust"]),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -135,9 +136,7 @@ async def save_issue(
     """Save an issue to user's list."""
     user = current_user
 
-    issue_exists = await db.execute(
-        select(Issue).where(Issue.id == issue_id)
-    )
+    issue_exists = await db.execute(select(Issue).where(Issue.id == issue_id))
     if not issue_exists.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Issue not found")
 
@@ -247,47 +246,56 @@ async def get_trending_issues(
             rows = indexed_by_repo.get(full_name, [])
             if rows:
                 for issue, repo in rows:
-                    matches_raw.append({
-                        "issue": issue,
-                        "repository": repo,
-                        "match_score": 0.0,
-                        "matching_skills": [],
-                        "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
-                    })
+                    matches_raw.append(
+                        {
+                            "issue": issue,
+                            "repository": repo,
+                            "match_score": 0.0,
+                            "matching_skills": [],
+                            "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                        }
+                    )
             else:
                 github_issues = await github_service.fetch_issues_for_repo(
                     full_name=full_name, labels="good first issue", per_page=3
                 )
                 for item in github_issues:
-                    matches_raw.append({
-                        "issue": Issue(
-                            github_id=item["id"],
-                            number=item["number"],
-                            title=item.get("title", ""),
-                            body=(item.get("body") or "")[:2000],
-                            html_url=item["html_url"],
-                            state="open",
-                            labels=[lb["name"] for lb in item.get("labels", [])],
-                            is_good_first_issue=True,
-                            is_help_wanted=any("help wanted" in (lb.get("name", "") or "").lower() for lb in item.get("labels", [])),
-                            comments=item.get("comments", 0),
-                            created_at=parse_dt(item.get("created_at")),
-                            updated_at=parse_dt(item.get("updated_at")),
-                            complexity_score=0.5,
-                        ),
-                        "repository": Repository(
-                            full_name=full_name,
-                            name=full_name.split("/")[-1],
-                            owner_login=full_name.split("/")[0],
-                            html_url=repo_data.get("html_url", f"https://github.com/{full_name}"),
-                            stars=repo_data.get("stargazers_count", 0),
-                            primary_language=repo_data.get("language"),
-                            description=repo_data.get("description"),
-                        ),
-                        "match_score": 0.0,
-                        "matching_skills": [],
-                        "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
-                    })
+                    matches_raw.append(
+                        {
+                            "issue": Issue(
+                                github_id=item["id"],
+                                number=item["number"],
+                                title=item.get("title", ""),
+                                body=(item.get("body") or "")[:2000],
+                                html_url=item["html_url"],
+                                state="open",
+                                labels=[lb["name"] for lb in item.get("labels", [])],
+                                is_good_first_issue=True,
+                                is_help_wanted=any(
+                                    "help wanted" in (lb.get("name", "") or "").lower()
+                                    for lb in item.get("labels", [])
+                                ),
+                                comments=item.get("comments", 0),
+                                created_at=parse_dt(item.get("created_at")),
+                                updated_at=parse_dt(item.get("updated_at")),
+                                complexity_score=0.5,
+                            ),
+                            "repository": Repository(
+                                full_name=full_name,
+                                name=full_name.split("/")[-1],
+                                owner_login=full_name.split("/")[0],
+                                html_url=repo_data.get(
+                                    "html_url", f"https://github.com/{full_name}"
+                                ),
+                                stars=repo_data.get("stargazers_count", 0),
+                                primary_language=repo_data.get("language"),
+                                description=repo_data.get("description"),
+                            ),
+                            "match_score": 0.0,
+                            "matching_skills": [],
+                            "why_matched": f"Trending repository — {repo_data.get('stargazers_count', 0)} stars, active project",
+                        }
+                    )
 
     matches = []
     for m in matches_raw:
@@ -311,8 +319,12 @@ async def smart_search_issues(
     request: Request,
     q: str = Query(..., min_length=1, description="Natural language search query"),
     language: Optional[str] = Query(None, description="Filter by language"),
-    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(None, description="Filter by difficulty"),
-    label: Optional[Literal["good_first", "help_wanted"]] = Query(None, description="Filter by label"),
+    difficulty: Optional[Literal["beginner", "intermediate", "advanced"]] = Query(
+        None, description="Filter by difficulty"
+    ),
+    label: Optional[Literal["good_first", "help_wanted"]] = Query(
+        None, description="Filter by label"
+    ),
     limit: int = Query(30, le=100),
     offset: int = Query(0, ge=0),
     current_user: Optional[User] = Depends(get_optional_current_user),

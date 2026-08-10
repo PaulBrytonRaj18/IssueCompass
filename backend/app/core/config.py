@@ -98,7 +98,7 @@ class Settings(BaseSettings):
         if not self.SECRET_KEY or self.SECRET_KEY == "change_this_in_production_use_random_string":
             errors.append(
                 "SECRET_KEY is not set or still default. "
-                "Generate one with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+                'Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"'
             )
         if not self.GITHUB_TOKEN:
             errors.append(

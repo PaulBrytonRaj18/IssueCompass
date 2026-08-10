@@ -18,54 +18,54 @@ SCORE_WEIGHTS = {
 
 # ── Repo activity: star thresholds ────────────────────────────────
 STARS_VERY_HIGH = 10_000  # threshold for very popular repos
-STARS_HIGH = 1_000        # threshold for popular repos
-STARS_MEDIUM = 100        # threshold for moderately popular repos
+STARS_HIGH = 1_000  # threshold for popular repos
+STARS_MEDIUM = 100  # threshold for moderately popular repos
 
 # ── Repo activity: days since last index ──────────────────────────
-DAYS_RECENT = 7      # indexed within a week
-DAYS_MONTH = 30      # indexed within a month
+DAYS_RECENT = 7  # indexed within a week
+DAYS_MONTH = 30  # indexed within a month
 
 # ── Repo activity: fork threshold ─────────────────────────────────
 FORKS_MODERATE = 100  # indicates moderate community engagement
 
 # ── Freshness: day ranges ─────────────────────────────────────────
-FRESH_DAYS = 7     # issue created within a week
-MODERATE_DAYS = 30 # issue created within a month
-STALE_DAYS = 90    # issue created within 3 months
+FRESH_DAYS = 7  # issue created within a week
+MODERATE_DAYS = 30  # issue created within a month
+STALE_DAYS = 90  # issue created within 3 months
 
 # ── Popularity: comment thresholds ────────────────────────────────
-COMMENTS_HIGH = 20   # many comments (high engagement)
+COMMENTS_HIGH = 20  # many comments (high engagement)
 COMMENTS_MODERATE = 5  # some discussion
-COMMENTS_LOW = 0        # no comments (baseline)
+COMMENTS_LOW = 0  # no comments (baseline)
 
 # ── Popularity: fork thresholds ───────────────────────────────────
-FORKS_HIGH = 1_000    # many forks (widespread interest)
+FORKS_HIGH = 1_000  # many forks (widespread interest)
 FORKS_MODERATE_POP = 100  # moderate forks
 
 # ── Popularity: star thresholds ───────────────────────────────────
-STARS_TOP = 10_000   # top-tier popularity
-STARS_ACTIVE = 1_000 # active popularity
-STARS_KNOWN = 100    # known repo
-STARS_MINIMAL = 10   # minimal popularity
+STARS_TOP = 10_000  # top-tier popularity
+STARS_ACTIVE = 1_000  # active popularity
+STARS_KNOWN = 100  # known repo
+STARS_MINIMAL = 10  # minimal popularity
 
 # ── Live issue scorer: label boost values ──────────────────────────
 LABEL_BOOST_GFI = 0.6  # "good first issue" increases match score
-LABEL_BOOST_HELP = 0.3 # "help wanted" increases match score
+LABEL_BOOST_HELP = 0.3  # "help wanted" increases match score
 LABEL_BOOST_BUG = 0.1  # "bug" label contributes slightly
 
 # ── Live issue scorer: freshness defaults ─────────────────────────
-FRESHNESS_DEFAULT = 0.2   # fallback when date is unparseable
-FRESHNESS_RECENT = 1.0    # ≤ 7 days
+FRESHNESS_DEFAULT = 0.2  # fallback when date is unparseable
+FRESHNESS_RECENT = 1.0  # ≤ 7 days
 FRESHNESS_MODERATE = 0.8  # ≤ 30 days
-FRESHNESS_STALE = 0.5     # ≤ 90 days
+FRESHNESS_STALE = 0.5  # ≤ 90 days
 
 # ── Explain-score quality thresholds ──────────────────────────────
 QUALITY_EXCELLENT = 0.8  # "Strong match" threshold
-QUALITY_GOOD = 0.5       # "Good match" threshold
+QUALITY_GOOD = 0.5  # "Good match" threshold
 
 # ── Explain-score descriptor thresholds ───────────────────────────
-DESC_HIGH = 0.7   # "highly popular / very active / recently updated"
-DESC_MEDIUM = 0.4 # "popular / active" floor
+DESC_HIGH = 0.7  # "highly popular / very active / recently updated"
+DESC_MEDIUM = 0.4  # "popular / active" floor
 
 
 def compute_repo_activity_score(repo: Repository) -> float:
@@ -176,9 +176,7 @@ async def generate_ai_explanation(
     if not ai_service.AI_ENABLED:
         return None
     try:
-        return await ai_service.generate_match_explanation(
-            user_skills, issue_skills, match_score
-        )
+        return await ai_service.generate_match_explanation(user_skills, issue_skills, match_score)
     except Exception as e:
         logger.debug("AI explanation failed: %s", e)
         return None
@@ -262,7 +260,8 @@ def safe_explain_score(
     except Exception as exc:
         logger.warning(
             "explain_score failed for issue_id=%s: %s",
-            issue_id, exc,
+            issue_id,
+            exc,
         )
         score_pct = round(max(0.0, min(1.0, fallback_score)) * 100)
         return f"Matched ({score_pct}%)"
@@ -275,11 +274,11 @@ def safe_explain_score(
 # ---------------------------------------------------------------------------
 
 # ── Live issue scorer: sub-score weights ──────────────────────────
-WEIGHT_LANG = 0.40       # language match contribution
-WEIGHT_TOPIC = 0.20     # topic overlap contribution
-WEIGHT_LABEL = 0.15     # label match contribution
-WEIGHT_FRESHNESS = 0.15 # recency contribution
-WEIGHT_POP = 0.10       # popularity contribution
+WEIGHT_LANG = 0.40  # language match contribution
+WEIGHT_TOPIC = 0.20  # topic overlap contribution
+WEIGHT_LABEL = 0.15  # label match contribution
+WEIGHT_FRESHNESS = 0.15  # recency contribution
+WEIGHT_POP = 0.10  # popularity contribution
 
 # ── Live issue scorer: topic overlap multiplier ───────────────────
 TOPIC_OVERLAP_MULTIPLIER = 0.35  # each matching topic adds 0.35
@@ -289,27 +288,27 @@ LANG_BOOST_BASE = 0.5  # base language match score before proficiency scaling
 
 # ── Live issue scorer: popularity thresholds (live) ──────────────
 LIVE_STARS_VERY_HIGH = 10_000  # very popular repo
-LIVE_STARS_HIGH = 1_000        # popular repo
-LIVE_STARS_MEDIUM = 100        # moderately popular
+LIVE_STARS_HIGH = 1_000  # popular repo
+LIVE_STARS_MEDIUM = 100  # moderately popular
 
 # ── Live issue scorer: popularity increments ──────────────────────
-LIVE_POP_STARS_HIGH = 0.4   # very high stars contribution
-LIVE_POP_STARS_MEDIUM = 0.25 # high stars contribution
-LIVE_POP_STARS_LOW = 0.1    # moderate stars contribution
-LIVE_POP_FORKS_HIGH = 0.2   # many forks contribution
-LIVE_POP_FORKS_LOW = 0.1    # moderate forks contribution
+LIVE_POP_STARS_HIGH = 0.4  # very high stars contribution
+LIVE_POP_STARS_MEDIUM = 0.25  # high stars contribution
+LIVE_POP_STARS_LOW = 0.1  # moderate stars contribution
+LIVE_POP_FORKS_HIGH = 0.2  # many forks contribution
+LIVE_POP_FORKS_LOW = 0.1  # moderate forks contribution
 LIVE_POP_COMMENTS_HIGH = 0.3  # many comments contribution
 LIVE_POP_COMMENTS_LOW = 0.15  # some comments contribution
 
 # ── Live issue scorer: comment thresholds (live) ─────────────────
-LIVE_COMMENTS_HIGH = 20   # many comments
+LIVE_COMMENTS_HIGH = 20  # many comments
 LIVE_COMMENTS_MODERATE = 5  # some comments
 
 # ── Live issue scorer: fork thresholds (live) ────────────────────
 LIVE_FORKS_HIGH = 1_000  # many forks
 LIVE_FORKS_MODERATE = 100  # moderate forks
 LIVE_QUALITY_EXCELLENT = 0.8  # "Excellent" match threshold (live)
-LIVE_QUALITY_GOOD = 0.6       # "Good" match threshold (live)
+LIVE_QUALITY_GOOD = 0.6  # "Good" match threshold (live)
 
 # ── Interest match defaults ──────────────────────────────────────
 INTEREST_DEFAULT = 0.3  # fallback when user or issue lacks skill data
@@ -397,11 +396,11 @@ def score_live_issue(
 
     # ── Composite (weights must sum to 1.0)
     composite = (
-        lang_score    * WEIGHT_LANG +
-        topic_score   * WEIGHT_TOPIC +
-        label_score   * WEIGHT_LABEL +
-        freshness_score * WEIGHT_FRESHNESS +
-        pop_score     * WEIGHT_POP
+        lang_score * WEIGHT_LANG
+        + topic_score * WEIGHT_TOPIC
+        + label_score * WEIGHT_LABEL
+        + freshness_score * WEIGHT_FRESHNESS
+        + pop_score * WEIGHT_POP
     )
     return round(composite, 4)
 
@@ -422,7 +421,13 @@ def build_live_issue_explanation(
     stars = raw_repo.get("stargazers_count") or raw_repo.get("stars", 0)
     repo_name = raw_repo.get("full_name") or raw_repo.get("name", "")
 
-    quality = "Excellent" if score >= LIVE_QUALITY_EXCELLENT else "Good" if score >= LIVE_QUALITY_GOOD else "Partial"
+    quality = (
+        "Excellent"
+        if score >= LIVE_QUALITY_EXCELLENT
+        else "Good"
+        if score >= LIVE_QUALITY_GOOD
+        else "Partial"
+    )
     return (
         f"{quality} match ({pct}%) — {lang} repo '{repo_name}' "
         f"[{label_str}], {stars:,} stars (live result)"

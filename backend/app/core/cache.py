@@ -217,6 +217,7 @@ async def cache_get_with_stale(
 
 def _refresh_in_background(key: str, ttl: int, fetcher: Callable) -> None:
     """Recompute a cached value in background (fire-and-forget)."""
+
     async def _refresh():
         try:
             value = await fetcher()
@@ -227,10 +228,13 @@ def _refresh_in_background(key: str, ttl: int, fetcher: Callable) -> None:
 
     try:
         task = asyncio.create_task(_refresh())
-        task.add_done_callback(lambda t: (
-            logger.warning("Background refresh %s unhandled error: %s", key, t.exception())
-            if t.exception() else None
-        ))
+        task.add_done_callback(
+            lambda t: (
+                logger.warning("Background refresh %s unhandled error: %s", key, t.exception())
+                if t.exception()
+                else None
+            )
+        )
     except RuntimeError as exc:
         logger.warning("Could not schedule background refresh for %s: %s", key, exc)
 
@@ -271,9 +275,7 @@ async def cache_delete_pattern(pattern: str) -> int:
         cursor = 0
         prefixed_pattern = _key(pattern)
         while True:
-            cursor, keys = await client.scan(
-                cursor=cursor, match=prefixed_pattern, count=100
-            )
+            cursor, keys = await client.scan(cursor=cursor, match=prefixed_pattern, count=100)
             if keys:
                 await client.delete(*keys)
                 deleted += len(keys)

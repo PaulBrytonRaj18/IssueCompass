@@ -45,6 +45,7 @@ async def analyze_github_profile(
     await db.refresh(current_user)
 
     from app.core.cache import cache_delete
+
     await cache_delete(f"auth:me:{current_user.id}")
 
     return UserPublic.model_validate(current_user)
