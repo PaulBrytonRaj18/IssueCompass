@@ -63,6 +63,13 @@ FRESHNESS_STALE = 0.5  # ≤ 90 days
 QUALITY_EXCELLENT = 0.8  # "Strong match" threshold
 QUALITY_GOOD = 0.5  # "Good match" threshold
 
+
+def _days_since(dt: datetime) -> int:
+    """Return whole days elapsed since ``dt``, accepting naive or aware datetimes."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - dt).days
+
 # ── Explain-score descriptor thresholds ───────────────────────────
 DESC_HIGH = 0.7  # "highly popular / very active / recently updated"
 DESC_MEDIUM = 0.4  # "popular / active" floor
@@ -79,7 +86,7 @@ def compute_repo_activity_score(repo: Repository) -> float:
     elif repo.stars > STARS_MEDIUM:
         score += 0.1
     if repo.last_indexed:
-        days_since = (datetime.now(timezone.utc) - repo.last_indexed).days
+        days_since = _days_since(repo.last_indexed)
         if days_since < DAYS_RECENT:
             score += 0.15
         elif days_since < DAYS_MONTH:
@@ -92,7 +99,7 @@ def compute_repo_activity_score(repo: Repository) -> float:
 def compute_freshness_score(issue: Issue) -> float:
     if not issue.created_at:
         return 0.3
-    days_old = (datetime.now(timezone.utc) - issue.created_at).days
+    days_old = _days_since(issue.created_at)
     if days_old < FRESH_DAYS:
         return 1.0
     if days_old < MODERATE_DAYS:
@@ -361,7 +368,7 @@ def score_live_issue(
     if updated_str:
         try:
             updated_dt = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
-            age_days = (datetime.now(timezone.utc) - updated_dt).days
+            age_days = _days_since(updated_dt)
             if age_days <= FRESH_DAYS:
                 freshness_score = FRESHNESS_RECENT
             elif age_days <= MODERATE_DAYS:

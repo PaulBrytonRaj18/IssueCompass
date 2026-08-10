@@ -78,6 +78,14 @@ class TestScoringEdgeCases:
         issue = _make_issue(created_at=datetime.now(timezone.utc) - timedelta(days=1000))
         assert scoring_service.compute_freshness_score(issue) == 0.2
 
+    def test_freshness_score_accepts_naive_datetime(self):
+        issue = _make_issue(created_at=datetime.utcnow() - timedelta(days=1))
+        assert scoring_service.compute_freshness_score(issue) == 1.0
+
+    def test_repo_activity_score_accepts_naive_datetime(self):
+        repo = _make_repo(last_indexed=datetime.utcnow() - timedelta(days=1))
+        assert scoring_service.compute_repo_activity_score(repo) == 0.75
+
     def test_freshness_edge_boundaries(self):
         """Test the exact boundary values (7, 30, 90 days)."""
         now = datetime.now(timezone.utc)
