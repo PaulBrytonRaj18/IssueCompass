@@ -70,6 +70,7 @@ def _days_since(dt: datetime) -> int:
         dt = dt.replace(tzinfo=timezone.utc)
     return (datetime.now(timezone.utc) - dt).days
 
+
 # ── Explain-score descriptor thresholds ───────────────────────────
 DESC_HIGH = 0.7  # "highly popular / very active / recently updated"
 DESC_MEDIUM = 0.4  # "popular / active" floor
