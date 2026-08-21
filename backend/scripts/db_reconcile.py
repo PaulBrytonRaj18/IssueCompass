@@ -41,10 +41,11 @@ async def reconcile() -> int:
     if "+asyncpg" not in db_url:
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
 
+    from uuid import uuid4
+
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.pool import NullPool
-    from uuid import uuid4
 
     def prepared_statement_name() -> str:
         """Avoid default asyncpg name collisions on PgBouncer backends."""
