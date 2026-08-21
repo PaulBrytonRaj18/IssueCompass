@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from typing import Dict, List, Literal, Optional
 
@@ -27,8 +28,6 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 
 
 def _to_repo_public(repo) -> RepositoryPublic:
-    if isinstance(repo, dict):
-        return RepositoryPublic.model_validate(repo)
     return RepositoryPublic.model_validate(repo)
 
 
@@ -260,9 +259,11 @@ async def get_trending_issues(
                     full_name=full_name, labels="good first issue", per_page=3
                 )
                 for item in github_issues:
+                    _stable_id = int(hashlib.md5(full_name.encode()).hexdigest()[:8], 16)
                     matches_raw.append(
                         {
                             "issue": Issue(
+                                id=0,
                                 github_id=item["id"],
                                 number=item["number"],
                                 title=item.get("title", ""),
@@ -279,8 +280,11 @@ async def get_trending_issues(
                                 created_at=parse_dt(item.get("created_at")),
                                 updated_at=parse_dt(item.get("updated_at")),
                                 complexity_score=0.5,
+                                repository_id=0,
                             ),
                             "repository": Repository(
+                                id=0,
+                                github_id=_stable_id,
                                 full_name=full_name,
                                 name=full_name.split("/")[-1],
                                 owner_login=full_name.split("/")[0],

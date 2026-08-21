@@ -343,26 +343,6 @@ async def cache_ping() -> bool:
     except Exception:
         return False
 
-
-async def cache_health() -> dict:
-    """Return detailed Redis health information."""
-    client = await get_redis()
-    if client is None:
-        return {"available": False}
-    try:
-        info = await client.info()
-        return {
-            "available": True,
-            "version": info.get("redis_version", "unknown"),
-            "used_memory_human": info.get("used_memory_human", "unknown"),
-            "connected_clients": info.get("connected_clients", 0),
-            "uptime_in_seconds": info.get("uptime_in_seconds", 0),
-            "total_keys": info.get("db0", {}).get("keys", 0) if "db0" in info else None,
-        }
-    except Exception:
-        return {"available": True, "detail": "info_unavailable"}
-
-
 def cache_stats() -> dict:
     """Return cache hit/miss metrics and latency for monitoring."""
     total = _hits + _misses

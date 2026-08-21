@@ -550,9 +550,3 @@ async def extract_required_skills(
         "labels": labels,
     }
 
-
-async def build_user_skills(github_username: str) -> Dict[str, Any]:
-    """Full pipeline: fetch GitHub data → build skill fingerprint."""
-    repos = await fetch_user_repos(github_username)
-    fingerprint = await build_skill_fingerprint(repos)
-    return fingerprint

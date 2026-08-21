@@ -113,17 +113,6 @@ Rules:
 - expanded_query: create a search-friendly version""",
 }
 
-SYSTEM_PROMPTS[
-    "vector_text"
-] = """You generate a dense semantic description of a developer's skills or an issue's requirements.
-Produce ONLY a JSON object with:
-{
-  "text": "A short paragraph describing the technical profile (max 100 words)"
-}
-
-Focus on: programming languages, frameworks, domains, experience level, and key technologies.
-This text will be used for semantic matching, so make it informative and precise."""
-
 
 def _groq_headers() -> Dict[str, str]:
     return {
@@ -282,10 +271,6 @@ async def _call_jina_embed(text: str) -> Optional[List[float]]:
             logger.debug("Jina embed: %s tokens used", usage.get("total_tokens", 0))
 
         return embedding
-
-
-def _jina_enabled() -> bool:
-    return EMBEDDINGS_ENABLED
 
 
 async def generate_embedding(text: str) -> Optional[List[float]]:
@@ -450,28 +435,3 @@ async def parse_query_with_ai(query: str) -> Optional[Dict[str, Any]]:
 
     return await _cached_ai_call(cache_key, AI_CACHE_TTL_QUERY, _execute)
 
-
-async def generate_vector_text(
-    fingerprint: Dict[str, Any],
-) -> Optional[str]:
-    """Generate a dense semantic description for vector embedding."""
-    if not AI_ENABLED:
-        return None
-
-    user_prompt = json.dumps(
-        {
-            "languages": fingerprint.get("languages", {}),
-            "top_skills": fingerprint.get("top_skills", []),
-            "categories": fingerprint.get("categories", {}),
-            "experience_level": fingerprint.get("experience_level", "unknown"),
-        },
-        indent=2,
-    )
-
-    try:
-        raw = await _call_groq(SYSTEM_PROMPTS["vector_text"], user_prompt, temp=0.2, max_tokens=256)
-        result = await _parse_json_response(raw)
-        return result.get("text") if result else None
-    except Exception as e:
-        logger.warning("AI vector text generation failed: %s", e)
-        return None

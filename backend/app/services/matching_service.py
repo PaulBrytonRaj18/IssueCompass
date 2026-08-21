@@ -33,15 +33,6 @@ LIVE_MATCH_CACHE_TTL = 180  # 3 minutes
 # Minimum composite score for a live issue to be persisted to PostgreSQL
 PERSIST_SCORE_THRESHOLD = 0.65
 
-# Failure counter for _persist_high_score_issues persistence errors
-_persist_failure_count = 0
-
-
-def _increment_persist_failure() -> None:
-    global _persist_failure_count  # noqa: PLW0603
-    _persist_failure_count += 1
-
-
 def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
     a = np.array(vec_a, dtype=np.float32)
     b = np.array(vec_b, dtype=np.float32)
@@ -176,6 +167,7 @@ async def _persist_high_score_issues(
         if not high_score:
             return
 
+        failure_count = 0
         for match in high_score:
             try:
                 github_id = match["_raw_github_id"]
@@ -233,7 +225,7 @@ async def _persist_high_score_issues(
                 db.add(new_issue)
 
             except Exception as exc:
-                _increment_persist_failure()
+                failure_count += 1
                 logger.error(
                     "Failed to persist live issue github_id=%s, title=%s: %s",
                     match.get("_raw_github_id"),
@@ -243,11 +235,11 @@ async def _persist_high_score_issues(
 
         try:
             await db.commit()
-            success_count = len(high_score) - _persist_failure_count
+            success_count = len(high_score) - failure_count
             logger.info(
                 "Persist result: %d succeeded, %d failed out of %d high-score issues",
                 success_count,
-                _persist_failure_count,
+                failure_count,
                 len(high_score),
             )
         except Exception as exc:

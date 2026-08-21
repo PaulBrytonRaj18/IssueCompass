@@ -76,7 +76,7 @@ services:
       METRICS_API_KEY: ${METRICS_API_KEY:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
-      - "8000:8080"
+      - "8000:8000"
     networks:
       - internal
     deploy:

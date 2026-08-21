@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
@@ -370,6 +371,7 @@ async def _github_fallback(
             parsed.append(
                 {
                     "issue": Issue(
+                        id=0,
                         github_id=item["id"],
                         number=item["number"],
                         title=item.get("title", ""),
@@ -389,8 +391,11 @@ async def _github_fallback(
                         created_at=parse_dt(item.get("created_at")),
                         updated_at=parse_dt(item.get("updated_at")),
                         complexity_score=0.5,
+                        repository_id=0,
                     ),
                     "repository": Repository(
+                        id=0,
+                        github_id=int(hashlib.md5((repo_data.get("full_name", "") or "").encode()).hexdigest()[:8], 16),
                         full_name=repo_data.get("full_name", ""),
                         name=(repo_data.get("full_name") or "").split("/")[-1],
                         owner_login=(repo_data.get("full_name") or "").split("/")[0]

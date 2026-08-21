@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.models.models import Issue, Repository
-from app.services import ai_service
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +57,9 @@ FRESHNESS_DEFAULT = 0.2  # fallback when date is unparseable
 FRESHNESS_RECENT = 1.0  # ≤ 7 days
 FRESHNESS_MODERATE = 0.8  # ≤ 30 days
 FRESHNESS_STALE = 0.5  # ≤ 90 days
+
+# ── Interest match defaults ──────────────────────────────────────
+INTEREST_DEFAULT = 0.3  # fallback when user or issue lacks skill data
 
 # ── Explain-score quality thresholds ──────────────────────────────
 QUALITY_EXCELLENT = 0.8  # "Strong match" threshold
@@ -173,22 +175,6 @@ def compute_final_score(
         + SCORE_WEIGHTS["interest_match"] * interest_match
         + SCORE_WEIGHTS["popularity"] * popularity
     )
-
-
-async def generate_ai_explanation(
-    user_skills: Dict[str, Any],
-    issue_skills: Dict[str, Any],
-    match_score: float,
-) -> Optional[str]:
-    """Try to generate an AI-powered explanation, returns None if unavailable."""
-    if not ai_service.AI_ENABLED:
-        return None
-    try:
-        return await ai_service.generate_match_explanation(user_skills, issue_skills, match_score)
-    except Exception as e:
-        logger.debug("AI explanation failed: %s", e)
-        return None
-
 
 def explain_score(
     skill_similarity: float,
@@ -317,10 +303,6 @@ LIVE_FORKS_HIGH = 1_000  # many forks
 LIVE_FORKS_MODERATE = 100  # moderate forks
 LIVE_QUALITY_EXCELLENT = 0.8  # "Excellent" match threshold (live)
 LIVE_QUALITY_GOOD = 0.6  # "Good" match threshold (live)
-
-# ── Interest match defaults ──────────────────────────────────────
-INTEREST_DEFAULT = 0.3  # fallback when user or issue lacks skill data
-
 
 def score_live_issue(
     user_skills: dict,
