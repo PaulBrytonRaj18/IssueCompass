@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from app.services import ai_service
-from app.services.github_service import fetch_user_repos
 
 logger = logging.getLogger(__name__)
 
