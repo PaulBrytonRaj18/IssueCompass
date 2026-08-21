@@ -143,16 +143,19 @@ async def check_async_engine() -> int:
         if PGCONN_ARGS.get("statement_cache_size") != 0:
             _fail("PgBouncer", "statement_cache_size is not 0")
             failed += 1
-        elif "prepared_statement_cache_size" in PGCONN_ARGS:
+        elif PGCONN_ARGS.get("prepared_statement_cache_size") != 0:
             _fail(
                 "PgBouncer",
-                "prepared_statement_cache_size present but asyncpg does not accept this param",
+                "SQLAlchemy asyncpg prepared_statement_cache_size is not 0",
             )
+            failed += 1
+        elif not callable(PGCONN_ARGS.get("prepared_statement_name_func")):
+            _fail("PgBouncer", "prepared_statement_name_func is not configured")
             failed += 1
         else:
             _ok(
                 "PgBouncer",
-                "statement_cache_size=0 (prepared_statement_cache_size is not a valid asyncpg param)",
+                "asyncpg and SQLAlchemy statement caches disabled; unique statement names enabled",
             )
     except Exception as e:
         _fail("PgBouncer", f"could not inspect PGCONN_ARGS: {e}")
@@ -164,9 +167,9 @@ async def check_async_engine() -> int:
 
         pool = engine.pool
         if isinstance(pool, NullPool):
-            _ok("Pool class", "NullPool — session-mode PgBouncer")
+            _ok("Pool class", "NullPool — transaction/statement-mode PgBouncer safe")
         elif isinstance(pool, QueuePool):
-            _ok("Pool class", f"QueuePool(size={pool.size()}) — transaction-mode PgBouncer")
+            _ok("Pool class", f"QueuePool(size={pool.size()}) — direct DB/session-mode PgBouncer")
         else:
             _fail("Pool class", f"unexpected poolclass={type(pool).__name__}")
             failed += 1

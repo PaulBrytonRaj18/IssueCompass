@@ -38,10 +38,9 @@ class Settings(BaseSettings):
     DB_SSL_MODE: str = "require"
 
     # Connection pool
-    # DB_POOL_SIZE=0  → NullPool (PgBouncer session-mode compatibility)
-    # DB_POOL_SIZE>0  → QueuePool (reuses connections, ~50ms faster per request)
-    # Requires PgBouncer in transaction mode when PgBouncer is used.
-    DB_POOL_SIZE: int = 20
+    # DB_POOL_SIZE=0  → NullPool (safe default for PgBouncer transaction/statement mode)
+    # DB_POOL_SIZE>0  → QueuePool (use only for a direct database or session-mode PgBouncer)
+    DB_POOL_SIZE: int = 0
     DB_POOL_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
 

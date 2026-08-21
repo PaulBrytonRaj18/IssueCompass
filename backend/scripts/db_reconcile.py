@@ -44,6 +44,11 @@ async def reconcile() -> int:
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlalchemy.pool import NullPool
+    from uuid import uuid4
+
+    def prepared_statement_name() -> str:
+        """Avoid default asyncpg name collisions on PgBouncer backends."""
+        return f"__issuecompass_reconcile_{uuid4().hex}__"
 
     # ── Single attempt — fail fast ────────────────────────────────────────
     # Retries are intentionally absent. If this fails due to a configuration
@@ -54,13 +59,17 @@ async def reconcile() -> int:
         poolclass=NullPool,
         connect_args={
             "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "prepared_statement_name_func": prepared_statement_name,
             "timeout": 10,
             "command_timeout": 30,
             "ssl": _settings.DB_SSL_MODE,
         },
     )
     print(
-        f"DB_RECONCILE: engine created — target={_mask_db_url(db_url)} stmt_cache=0 fail_fast=True"
+        "DB_RECONCILE: engine created — "
+        f"target={_mask_db_url(db_url)} asyncpg_stmt_cache=0 dialect_stmt_cache=0 "
+        "unique_stmt_names=true fail_fast=True"
     )
     try:
         async with engine.connect() as conn:
@@ -117,8 +126,8 @@ async def reconcile() -> int:
             file=sys.stderr,
         )
         print(
-            "  3. statement_cache_size=0 and prepared_statement_cache_size=0 "
-            "are set in connect_args (both are required for PgBouncer)",
+            "  3. statement_cache_size=0, prepared_statement_cache_size=0, and a unique "
+            "prepared_statement_name_func are set in connect_args (all are required for PgBouncer)",
             file=sys.stderr,
         )
         return 1

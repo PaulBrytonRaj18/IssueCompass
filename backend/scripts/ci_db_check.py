@@ -124,19 +124,25 @@ def check_pgbouncer() -> int:
     else:
         _ok("pgbouncer", "statement_cache_size=0")
 
-    if "prepared_statement_cache_size" in PGCONN_ARGS:
-        _fail("pgbouncer", "prepared_statement_cache_size present but NOT a valid asyncpg param")
+    if PGCONN_ARGS.get("prepared_statement_cache_size") != 0:
+        _fail("pgbouncer", "SQLAlchemy prepared_statement_cache_size is not 0")
         errors += 1
     else:
-        _ok("pgbouncer", "prepared_statement_cache_size absent (correct — not a valid param)")
+        _ok("pgbouncer", "SQLAlchemy prepared_statement_cache_size=0")
+
+    if not callable(PGCONN_ARGS.get("prepared_statement_name_func")):
+        _fail("pgbouncer", "prepared_statement_name_func is not configured")
+        errors += 1
+    else:
+        _ok("pgbouncer", "unique prepared_statement_name_func configured")
 
     pool = engine.pool
     if isinstance(pool, NullPool):
-        _ok("pgbouncer", "poolclass=NullPool (session-mode PgBouncer)")
+        _ok("pgbouncer", "poolclass=NullPool (transaction/statement-mode PgBouncer safe)")
     elif isinstance(pool, QueuePool):
         _ok(
             "pgbouncer",
-            f"poolclass=QueuePool(size={pool.size()}, overflow={pool._max_overflow}) (transaction-mode PgBouncer)",
+            f"poolclass=QueuePool(size={pool.size()}, overflow={pool._max_overflow}) (direct DB/session-mode PgBouncer)",
         )
     else:
         _fail("pgbouncer", f"unexpected poolclass={type(pool).__name__}")

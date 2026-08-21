@@ -2,18 +2,18 @@
 Database connection architecture.
 
 Connection Pooling Strategy:
-  When DB_POOL_SIZE > 0: QueuePool (reuses connections, ~50ms faster/request).
-  When DB_POOL_SIZE = 0: NullPool  (PgBouncer session-mode compatibility).
+  When DB_POOL_SIZE > 0: QueuePool (use with direct PostgreSQL or PgBouncer
+  session pooling). When DB_POOL_SIZE = 0: NullPool (the safe default for
+  PgBouncer transaction/statement pooling).
 
-  statement_cache_size=0 is always set to disable asyncpg's prepared
-  statement cache, which conflicts with PgBouncer session-mode pooling.
-
-  NOTE: "prepared_statement_cache_size" is NOT a valid asyncpg.connect()
-  parameter in any version up to 0.29.x.  Only statement_cache_size exists.
+  statement_cache_size=0 disables asyncpg's cache; SQLAlchemy's dialect cache
+  is separately disabled with prepared_statement_cache_size=0. A UUID-based
+  statement-name function prevents name collisions on a reused backend.
 """
 
 import logging
 import socket
+from uuid import uuid4
 
 import asyncpg
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -31,24 +31,27 @@ if "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
 # ── Connection arguments (PgBouncer-safe) ─────────────────────────────
-# statement_cache_size=0 disables asyncpg's prepared statement cache.
-# Without this, PgBouncer session pooling routes queries to different
-# backend connections, causing:
-#   InvalidSQLStatementNameError — prepared stmt does not exist on backend
-#   DuplicatePreparedStatementError — same stmt name reused across backends
-#
-# IMPORTANT: "prepared_statement_cache_size" is NOT a valid asyncpg
-# parameter anywhere in the 0.x line.  Only statement_cache_size exists.
+# asyncpg consumes statement_cache_size. prepared_statement_cache_size and
+# prepared_statement_name_func are consumed by SQLAlchemy's asyncpg dialect
+# before it calls asyncpg.connect(). Both caches must be off for PgBouncer
+# transaction/statement pooling. The dialect still prepares statements, so
+# UUID-derived names avoid collisions with asyncpg's process-local counter.
+def _prepared_statement_name() -> str:
+    return f"__issuecompass_{uuid4().hex}__"
+
+
 PGCONN_ARGS: dict = {
     "timeout": 10,
     "statement_cache_size": 0,
+    "prepared_statement_cache_size": 0,
+    "prepared_statement_name_func": _prepared_statement_name,
     "command_timeout": 30,
     "ssl": settings.DB_SSL_MODE,
 }
 
 # ── Pool class selection ──────────────────────────────────────────────
 # DB_POOL_SIZE > 0  → AsyncAdaptedQueuePool  (connection reuse, lower latency)
-# DB_POOL_SIZE = 0  → NullPool               (PgBouncer session-mode compatibility)
+# DB_POOL_SIZE = 0  → NullPool               (PgBouncer transaction/statement safe)
 #
 # SQLAlchemy's create_async_engine auto-selects AsyncAdaptedQueuePool
 # (the async-safe equivalent of QueuePool) when pool_size is provided.
@@ -119,7 +122,8 @@ def _mask_db_url(raw: str) -> str:
 
 asyncpg_version = getattr(asyncpg, "__version__", "unknown")
 logger.info(
-    "DB_ENGINE: creating async engine — target=%s asyncpg=%s poolclass=%s stmt_cache=0",
+    "DB_ENGINE: creating async engine — target=%s asyncpg=%s poolclass=%s "
+    "asyncpg_stmt_cache=0 dialect_stmt_cache=0 unique_stmt_names=true",
     _mask_db_url(settings.DATABASE_URL),
     asyncpg_version,
     _pool_label,

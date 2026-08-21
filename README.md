@@ -363,7 +363,7 @@ env-check (verify all 9 secrets exist)
 | `backend-lint` | ruff (PEP 8) + mypy (strict) — zero errors |
 | `frontend` | npm ci + lint + TypeScript `--noEmit` |
 | `backend-test` | 104 pytest (mocked DB/Redis, no services needed) |
-| `db-validate` | Real pgvector connection, `statement_cache_size=0` PgBouncer safety, `db_reconcile` on fresh DB, Alembic migrations, schema introspection |
+| `db-validate` | Real pgvector connection, PgBouncer-safe asyncpg/SQLAlchemy caches and unique statement names, `db_reconcile` on fresh DB, Alembic migrations, schema introspection |
 | `startup-validate` | Actual FastAPI boot with uvicorn, Alembic pre-applied, `/health` validates status+DB+Redis+version+pool |
 | `docker-validate` | Build Docker image from `backend/Dockerfile`, run container with `--network host`, validate `/health` |
 | `deploy` | Fires only on `main` + `push` after all 7 gates pass. Curl POST to `RENDER_DEPLOY_HOOK_URL` |
@@ -389,9 +389,10 @@ Services: `db` (pgvector/pg16), `redis` (redis:7-alpine), `backend` (FastAPI), `
 1. Set `SECRET_KEY` to a secure random value (`python3 -c "import secrets; print(secrets.token_hex(32))"`)
 2. Set `REDIS_URL` to your managed Redis instance (Upstash, ElastiCache, Redis Cloud with `rediss://`)
 3. Set `DATABASE_URL` to your managed PostgreSQL (Supabase, RDS, etc.)
-4. Set `FRONTEND_URL` for CORS configuration
-5. Enable AI: `GROQ_API_KEY` + `AI_ENABLED=true`
-6. Verify with `curl /health`
+4. If `DATABASE_URL` points to PgBouncer in `transaction` or `statement` mode, leave `DB_POOL_SIZE=0` and configure PgBouncer to reset server connections with `server_reset_query = DISCARD ALL` and `server_reset_query_always = 1`. This prevents prepared statements from accumulating on reused backend connections.
+5. Set `FRONTEND_URL` for CORS configuration
+6. Enable AI: `GROQ_API_KEY` + `AI_ENABLED=true`
+7. Verify with `curl /health`
 
 ---
 
