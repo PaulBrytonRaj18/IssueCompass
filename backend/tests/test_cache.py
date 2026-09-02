@@ -11,7 +11,6 @@ from app.core.cache import (
     cache_exists,
     cache_get,
     cache_get_with_stale,
-
     cache_ping,
     cache_set,
     cache_stats,

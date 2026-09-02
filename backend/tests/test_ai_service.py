@@ -14,7 +14,6 @@ from app.services.ai_service import (
     close_client,
     generate_embedding,
     generate_match_explanation,
-
     parse_query_with_ai,
 )
 
