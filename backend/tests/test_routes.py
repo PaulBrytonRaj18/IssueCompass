@@ -223,7 +223,7 @@ class TestIssuesEndpoints:
         assert "total_repos_indexed" in data
 
     def test_search_requires_query(self, client):
-        resp = client.get("/api/v1/issues/search")
+        resp = client.get("/api/v1/issues/smart-search")
         assert resp.status_code == 422
 
     def test_save_issue_requires_auth(self, client):
