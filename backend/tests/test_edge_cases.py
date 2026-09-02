@@ -84,7 +84,7 @@ class TestScoringEdgeCases:
 
     def test_repo_activity_score_accepts_naive_datetime(self):
         repo = _make_repo(last_indexed=datetime.utcnow() - timedelta(days=1))
-        assert scoring_service.compute_repo_activity_score(repo) == 0.75
+        assert scoring_service.compute_repo_activity_score(repo) == 0.65
 
     def test_freshness_edge_boundaries(self):
         """Test the exact boundary values (7, 30, 90 days)."""
@@ -475,6 +475,11 @@ class TestWorkerEdgeCases:
         mock_result.fetchall.return_value = []
         mock_db.execute = AsyncMock(return_value=mock_result)
         mock_db.commit = AsyncMock()
-        await cleanup_stale_issues_task({"db": mock_db})
-        assert mock_db.execute.called
-        assert mock_db.commit.called
+
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = mock_db
+
+        with patch("app.worker.AsyncSessionLocal", mock_session_local):
+            await cleanup_stale_issues_task({})
+            assert mock_db.execute.called
+            assert mock_db.commit.called

@@ -11,7 +11,7 @@ from app.core.cache import (
     cache_exists,
     cache_get,
     cache_get_with_stale,
-    cache_health,
+
     cache_ping,
     cache_set,
     cache_stats,
@@ -267,6 +267,19 @@ class TestCacheGetWithStale:
 
         assert "clear_test" not in _in_flight
 
+    async def test_cache_get_with_stale_negative_ttl(self, monkeypatch):
+        _reset_cache_globals(monkeypatch)
+        mock = AsyncMock()
+        mock.get.return_value = json.dumps("stale")
+        mock.ttl.return_value = -1 # Negative TTL
+        monkeypatch.setattr("app.core.cache._redis", mock)
+        monkeypatch.setattr("app.core.cache._available", True)
+
+        fetcher = AsyncMock(return_value="fresh")
+        # should early expire triggers refresh if ttl <= 0
+        result = await cache_get_with_stale("early_neg", 60, fetcher)
+        assert result == "stale"
+
 
 # ── cache_delete ──────────────────────────────────────────────────
 
@@ -383,47 +396,6 @@ class TestCachePing:
         monkeypatch.setattr("app.core.cache._available", True)
 
         assert await cache_ping() is True
-
-
-# ── cache_health ──────────────────────────────────────────────────
-
-
-class TestCacheHealth:
-    async def test_returns_unavailable_when_no_redis(self, monkeypatch):
-        _reset_cache_globals(monkeypatch)
-        monkeypatch.setattr("app.core.cache._available", False)
-        health = await cache_health()
-        assert health["available"] is False
-
-    async def test_returns_info_when_redis_available(self, monkeypatch):
-        _reset_cache_globals(monkeypatch)
-        mock = AsyncMock()
-        mock.info = AsyncMock(
-            return_value={
-                "redis_version": "7.2",
-                "used_memory_human": "1.5M",
-                "connected_clients": 5,
-                "uptime_in_seconds": 3600,
-                "db0": {"keys": 42},
-            }
-        )
-        monkeypatch.setattr("app.core.cache._redis", mock)
-        monkeypatch.setattr("app.core.cache._available", True)
-
-        health = await cache_health()
-        assert health["available"] is True
-        assert health["version"] == "7.2"
-        assert health["total_keys"] == 42
-
-    async def test_graceful_on_info_error(self, monkeypatch):
-        _reset_cache_globals(monkeypatch)
-        mock = AsyncMock()
-        mock.info = AsyncMock(side_effect=ConnectionError("broken"))
-        monkeypatch.setattr("app.core.cache._redis", mock)
-        monkeypatch.setattr("app.core.cache._available", True)
-
-        health = await cache_health()
-        assert health["available"] is True
 
 
 # ── cache_stats ───────────────────────────────────────────────────

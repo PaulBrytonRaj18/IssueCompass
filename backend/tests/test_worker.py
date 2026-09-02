@@ -129,9 +129,15 @@ class TestIndexIssuesTask:
         mock_result.fetchall.return_value = [("python", 5), ("typescript", 3)]
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        ctx = {"db": mock_db}
+        ctx = {}
 
-        with patch("app.worker.index_language_issues", new=AsyncMock(return_value={"indexed": 1})):
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = mock_db
+
+        with (
+            patch("app.worker.index_language_issues", new=AsyncMock(return_value={"indexed": 1})),
+            patch("app.worker.AsyncSessionLocal", mock_session_local)
+        ):
             await index_issues_task(ctx)
             assert mock_db.execute.called
 
@@ -142,9 +148,15 @@ class TestIndexIssuesTask:
         mock_result.fetchall.return_value = []
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        ctx = {"db": mock_db}
+        ctx = {}
 
-        with patch("app.worker.index_language_issues", new=AsyncMock(return_value={"indexed": 0})):
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = mock_db
+
+        with (
+            patch("app.worker.index_language_issues", new=AsyncMock(return_value={"indexed": 0})),
+            patch("app.worker.AsyncSessionLocal", mock_session_local)
+        ):
             await index_issues_task(ctx)
             assert mock_db.execute.called
 
@@ -158,10 +170,15 @@ class TestCleanupStaleIssues:
         mock_db.execute = AsyncMock(return_value=mock_result)
         mock_db.commit = AsyncMock()
 
-        ctx = {"db": mock_db}
-        await cleanup_stale_issues_task(ctx)
-        assert mock_db.execute.called
-        assert mock_db.commit.called
+        ctx = {}
+
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = mock_db
+
+        with patch("app.worker.AsyncSessionLocal", mock_session_local):
+            await cleanup_stale_issues_task(ctx)
+            assert mock_db.execute.called
+            assert mock_db.commit.called
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_issues_handles_exception(self):
@@ -169,6 +186,11 @@ class TestCleanupStaleIssues:
         mock_db.execute = AsyncMock(side_effect=Exception("DB error"))
         mock_db.rollback = AsyncMock()
 
-        ctx = {"db": mock_db}
-        await cleanup_stale_issues_task(ctx)
-        assert mock_db.rollback.called
+        ctx = {}
+
+        mock_session_local = MagicMock()
+        mock_session_local.return_value.__aenter__.return_value = mock_db
+
+        with patch("app.worker.AsyncSessionLocal", mock_session_local):
+            await cleanup_stale_issues_task(ctx)
+            assert mock_db.rollback.called

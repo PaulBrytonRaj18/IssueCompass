@@ -14,7 +14,7 @@ from app.services.ai_service import (
     close_client,
     generate_embedding,
     generate_match_explanation,
-    generate_vector_text,
+
     parse_query_with_ai,
 )
 
@@ -60,6 +60,44 @@ async def test_parse_query_returns_none_on_bad_json():
     ):
         result = await parse_query_with_ai("some query")
         assert result is None
+
+
+@pytest.mark.asyncio
+async def test_parse_query_missing_fields_in_response():
+    mock_groq_response = json.dumps(
+        {
+            "languages": ["python"],
+        }
+    )
+    with (
+        patch("app.services.ai_service.AI_ENABLED", True),
+        patch("app.services.ai_service._call_groq", new=AsyncMock(return_value=mock_groq_response)),
+        patch("app.services.ai_service.cache_get", new=AsyncMock(return_value=None)),
+        patch("app.services.ai_service.cache_set", new=AsyncMock()),
+    ):
+        result = await parse_query_with_ai("python bug fix")
+        assert result is None  # Should return None if 'keywords' is missing
+
+
+@pytest.mark.asyncio
+async def test_parse_query_extremely_long_input():
+    # It should still cache using a truncated hash of the string, and call correctly
+    long_query = "python " * 1000
+    mock_groq_response = json.dumps(
+        {
+            "keywords": ["python"],
+            "languages": ["python"],
+        }
+    )
+    with (
+        patch("app.services.ai_service.AI_ENABLED", True),
+        patch("app.services.ai_service._call_groq", new=AsyncMock(return_value=mock_groq_response)),
+        patch("app.services.ai_service.cache_get", new=AsyncMock(return_value=None)),
+        patch("app.services.ai_service.cache_set", new=AsyncMock()),
+    ):
+        result = await parse_query_with_ai(long_query)
+        assert result is not None
+        assert "python" in result["keywords"]
 
 
 @pytest.mark.asyncio
@@ -112,6 +150,16 @@ class TestParseJsonResponse:
 
     async def test_returns_empty_dict_on_completely_unparseable(self):
         result = await _parse_json_response("This is just text without any JSON")
+        assert result == {}
+
+    async def test_extracts_json_with_trailing_garbage(self):
+        raw = '{"key": "value"} some random garbage here'
+        result = await _parse_json_response(raw)
+        assert result == {"key": "value"}
+
+    async def test_fails_on_nested_but_incomplete_json(self):
+        raw = '{"key": {"nested": "value"'
+        result = await _parse_json_response(raw)
         assert result == {}
 
 
@@ -187,16 +235,6 @@ async def test_generate_match_explanation_disabled():
         result = await generate_match_explanation(
             {"top_skills": ["python"]}, {"skills": ["python"]}, 0.9
         )
-        assert result is None
-
-
-# ── generate_vector_text ────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_generate_vector_text_disabled():
-    with patch("app.services.ai_service.AI_ENABLED", False):
-        result = await generate_vector_text({"languages": {"python": 1.0}})
         assert result is None
 
 
